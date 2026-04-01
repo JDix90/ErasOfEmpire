@@ -1,6 +1,6 @@
 {
   "map_id": "era_coldwar",
-  "name": "Cold War (1947\u20131991)",
+  "name": "Cold War (1947–1991)",
   "description": "The world divided between two superpowers. Command NATO forces in Western Europe, lead the Soviet bloc, fight proxy wars in Korea, Vietnam, and Africa, or play the Non-Aligned Movement as a kingmaker.",
   "era_theme": "coldwar",
   "canvas_width": 1200,
@@ -1197,123 +1197,53 @@
   ],
   "connections": [
     {
-      "from": "uk_ireland",
-      "to": "france_benelux",
-      "type": "sea"
-    },
-    {
-      "from": "uk_ireland",
-      "to": "scandinavia_cw",
-      "type": "sea"
-    },
-    {
-      "from": "france_benelux",
-      "to": "iberia_cw",
-      "type": "land"
-    },
-    {
-      "from": "france_benelux",
-      "to": "west_germany",
-      "type": "land"
-    },
-    {
-      "from": "france_benelux",
-      "to": "italy_cw",
-      "type": "land"
-    },
-    {
-      "from": "west_germany",
-      "to": "scandinavia_cw",
-      "type": "land"
-    },
-    {
-      "from": "west_germany",
-      "to": "east_germany",
-      "type": "land"
-    },
-    {
-      "from": "west_germany",
-      "to": "italy_cw",
-      "type": "land"
-    },
-    {
-      "from": "italy_cw",
-      "to": "romania_bulgaria",
-      "type": "sea"
-    },
-    {
-      "from": "turkey_cw",
-      "to": "romania_bulgaria",
-      "type": "land"
-    },
-    {
-      "from": "turkey_cw",
-      "to": "iraq_syria",
-      "type": "land"
-    },
-    {
-      "from": "turkey_cw",
+      "from": "afghanistan",
       "to": "caucasus_cw",
       "type": "land"
     },
     {
-      "from": "east_germany",
-      "to": "czechoslovakia",
+      "from": "afghanistan",
+      "to": "india_cw",
       "type": "land"
     },
     {
-      "from": "east_germany",
-      "to": "ukraine_cw",
-      "type": "land"
-    },
-    {
-      "from": "czechoslovakia",
-      "to": "romania_bulgaria",
-      "type": "land"
-    },
-    {
-      "from": "czechoslovakia",
-      "to": "ukraine_cw",
-      "type": "land"
-    },
-    {
-      "from": "ukraine_cw",
-      "to": "russia_west_cw",
-      "type": "land"
-    },
-    {
-      "from": "ukraine_cw",
-      "to": "caucasus_cw",
-      "type": "land"
-    },
-    {
-      "from": "russia_west_cw",
-      "to": "russia_central_cw",
-      "type": "land"
-    },
-    {
-      "from": "russia_central_cw",
-      "to": "russia_east_cw",
-      "type": "land"
-    },
-    {
-      "from": "russia_east_cw",
-      "to": "china_north_cw",
-      "type": "land"
-    },
-    {
-      "from": "russia_east_cw",
-      "to": "mongolia_cw",
-      "type": "land"
-    },
-    {
-      "from": "caucasus_cw",
+      "from": "afghanistan",
       "to": "iran_cw",
       "type": "land"
     },
     {
-      "from": "caucasus_cw",
-      "to": "afghanistan",
+      "from": "arabia_cw",
+      "to": "horn_africa",
+      "type": "sea"
+    },
+    {
+      "from": "arabia_cw",
+      "to": "iraq_syria",
+      "type": "land"
+    },
+    {
+      "from": "arabia_cw",
+      "to": "israel_jordan",
+      "type": "land"
+    },
+    {
+      "from": "brazil_cw",
+      "to": "colombia_venezuela",
+      "type": "land"
+    },
+    {
+      "from": "brazil_cw",
+      "to": "france_benelux",
+      "type": "land"
+    },
+    {
+      "from": "brazil_cw",
+      "to": "southern_cone",
+      "type": "land"
+    },
+    {
+      "from": "canada",
+      "to": "russia_east_cw",
       "type": "land"
     },
     {
@@ -1322,38 +1252,8 @@
       "type": "land"
     },
     {
-      "from": "usa_northeast",
-      "to": "usa_south",
-      "type": "land"
-    },
-    {
-      "from": "usa_south",
+      "from": "canada",
       "to": "usa_west_cw",
-      "type": "land"
-    },
-    {
-      "from": "usa_northeast",
-      "to": "uk_ireland",
-      "type": "sea"
-    },
-    {
-      "from": "usa_west_cw",
-      "to": "japan_cw",
-      "type": "sea"
-    },
-    {
-      "from": "usa_south",
-      "to": "mexico_ca",
-      "type": "land"
-    },
-    {
-      "from": "mexico_ca",
-      "to": "caribbean_cw",
-      "type": "sea"
-    },
-    {
-      "from": "mexico_ca",
-      "to": "colombia_venezuela",
       "type": "land"
     },
     {
@@ -1362,8 +1262,58 @@
       "type": "sea"
     },
     {
+      "from": "caucasus_cw",
+      "to": "iran_cw",
+      "type": "land"
+    },
+    {
+      "from": "caucasus_cw",
+      "to": "russia_central_cw",
+      "type": "land"
+    },
+    {
+      "from": "caucasus_cw",
+      "to": "russia_west_cw",
+      "type": "land"
+    },
+    {
+      "from": "caucasus_cw",
+      "to": "turkey_cw",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_cw",
+      "to": "north_africa_cw",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_cw",
+      "to": "west_africa_cw",
+      "type": "land"
+    },
+    {
+      "from": "china_north_cw",
+      "to": "china_south_cw",
+      "type": "land"
+    },
+    {
+      "from": "china_north_cw",
+      "to": "korea_cw",
+      "type": "land"
+    },
+    {
+      "from": "china_north_cw",
+      "to": "mongolia_cw",
+      "type": "land"
+    },
+    {
+      "from": "china_south_cw",
+      "to": "vietnam_korea",
+      "type": "land"
+    },
+    {
       "from": "colombia_venezuela",
-      "to": "brazil_cw",
+      "to": "mexico_ca",
       "type": "land"
     },
     {
@@ -1372,9 +1322,39 @@
       "type": "land"
     },
     {
-      "from": "brazil_cw",
-      "to": "southern_cone",
+      "from": "czechoslovakia",
+      "to": "east_germany",
       "type": "land"
+    },
+    {
+      "from": "czechoslovakia",
+      "to": "romania_bulgaria",
+      "type": "land"
+    },
+    {
+      "from": "czechoslovakia",
+      "to": "ukraine_cw",
+      "type": "land"
+    },
+    {
+      "from": "east_germany",
+      "to": "russia_west_cw",
+      "type": "land"
+    },
+    {
+      "from": "east_germany",
+      "to": "ukraine_cw",
+      "type": "land"
+    },
+    {
+      "from": "east_germany",
+      "to": "west_germany",
+      "type": "land"
+    },
+    {
+      "from": "egypt_cw",
+      "to": "arabia_cw",
+      "type": "sea"
     },
     {
       "from": "egypt_cw",
@@ -1387,53 +1367,18 @@
       "type": "land"
     },
     {
-      "from": "israel_jordan",
-      "to": "iraq_syria",
+      "from": "france_benelux",
+      "to": "iberia_cw",
       "type": "land"
     },
     {
-      "from": "iraq_syria",
-      "to": "iran_cw",
+      "from": "france_benelux",
+      "to": "italy_cw",
       "type": "land"
     },
     {
-      "from": "iraq_syria",
-      "to": "arabia_cw",
-      "type": "land"
-    },
-    {
-      "from": "iran_cw",
-      "to": "afghanistan",
-      "type": "land"
-    },
-    {
-      "from": "arabia_cw",
-      "to": "horn_africa",
-      "type": "sea"
-    },
-    {
-      "from": "north_africa_cw",
-      "to": "west_africa_cw",
-      "type": "land"
-    },
-    {
-      "from": "north_africa_cw",
-      "to": "horn_africa",
-      "type": "land"
-    },
-    {
-      "from": "west_africa_cw",
-      "to": "central_africa_cw",
-      "type": "land"
-    },
-    {
-      "from": "horn_africa",
-      "to": "central_africa_cw",
-      "type": "land"
-    },
-    {
-      "from": "central_africa_cw",
-      "to": "southern_africa_cw",
+      "from": "france_benelux",
+      "to": "west_germany",
       "type": "land"
     },
     {
@@ -1442,13 +1387,8 @@
       "type": "sea"
     },
     {
-      "from": "afghanistan",
-      "to": "india_cw",
-      "type": "land"
-    },
-    {
       "from": "india_cw",
-      "to": "china_south_cw",
+      "to": "iran_cw",
       "type": "land"
     },
     {
@@ -1457,39 +1397,39 @@
       "type": "land"
     },
     {
-      "from": "vietnam_korea",
-      "to": "china_south_cw",
-      "type": "land"
-    },
-    {
-      "from": "vietnam_korea",
-      "to": "indonesia_cw",
-      "type": "sea"
-    },
-    {
       "from": "indonesia_cw",
       "to": "australia_cw",
       "type": "sea"
     },
     {
-      "from": "mongolia_cw",
-      "to": "china_north_cw",
+      "from": "iran_cw",
+      "to": "iraq_syria",
       "type": "land"
     },
     {
-      "from": "china_north_cw",
-      "to": "china_south_cw",
+      "from": "iran_cw",
+      "to": "turkey_cw",
       "type": "land"
     },
     {
-      "from": "china_north_cw",
-      "to": "korea_cw",
+      "from": "iraq_syria",
+      "to": "israel_jordan",
       "type": "land"
     },
     {
-      "from": "korea_cw",
-      "to": "japan_cw",
-      "type": "sea"
+      "from": "iraq_syria",
+      "to": "turkey_cw",
+      "type": "land"
+    },
+    {
+      "from": "italy_cw",
+      "to": "romania_bulgaria",
+      "type": "land"
+    },
+    {
+      "from": "italy_cw",
+      "to": "turkey_cw",
+      "type": "land"
     },
     {
       "from": "japan_cw",
@@ -1497,22 +1437,42 @@
       "type": "sea"
     },
     {
-      "from": "southern_africa_cw",
-      "to": "australia_cw",
+      "from": "korea_cw",
+      "to": "japan_cw",
       "type": "sea"
     },
     {
-      "from": "east_germany",
-      "to": "russia_west_cw",
+      "from": "mexico_ca",
+      "to": "caribbean_cw",
+      "type": "sea"
+    },
+    {
+      "from": "mexico_ca",
+      "to": "usa_south",
       "type": "land"
     },
     {
-      "from": "scandinavia_cw",
-      "to": "russia_west_cw",
+      "from": "mexico_ca",
+      "to": "usa_west_cw",
       "type": "land"
     },
     {
-      "from": "italy_cw",
+      "from": "mongolia_cw",
+      "to": "russia_central_cw",
+      "type": "land"
+    },
+    {
+      "from": "mongolia_cw",
+      "to": "russia_east_cw",
+      "type": "land"
+    },
+    {
+      "from": "north_africa_cw",
+      "to": "west_africa_cw",
+      "type": "land"
+    },
+    {
+      "from": "romania_bulgaria",
       "to": "turkey_cw",
       "type": "land"
     },
@@ -1522,48 +1482,78 @@
       "type": "land"
     },
     {
-      "from": "russia_west_cw",
-      "to": "caucasus_cw",
+      "from": "russia_central_cw",
+      "to": "russia_east_cw",
       "type": "land"
     },
     {
       "from": "russia_central_cw",
-      "to": "caucasus_cw",
-      "type": "land"
-    },
-    {
-      "from": "turkey_cw",
-      "to": "iran_cw",
-      "type": "land"
-    },
-    {
-      "from": "israel_jordan",
-      "to": "arabia_cw",
-      "type": "land"
-    },
-    {
-      "from": "iran_cw",
-      "to": "india_cw",
-      "type": "land"
-    },
-    {
-      "from": "north_africa_cw",
-      "to": "central_africa_cw",
+      "to": "russia_west_cw",
       "type": "land"
     },
     {
       "from": "russia_east_cw",
-      "to": "korea_cw",
+      "to": "russia_west_cw",
       "type": "land"
     },
     {
-      "from": "russia_central_cw",
-      "to": "mongolia_cw",
+      "from": "russia_east_cw",
+      "to": "scandinavia_cw",
       "type": "land"
     },
     {
-      "from": "egypt_cw",
-      "to": "arabia_cw",
+      "from": "russia_west_cw",
+      "to": "scandinavia_cw",
+      "type": "land"
+    },
+    {
+      "from": "russia_west_cw",
+      "to": "ukraine_cw",
+      "type": "land"
+    },
+    {
+      "from": "scandinavia_cw",
+      "to": "west_germany",
+      "type": "land"
+    },
+    {
+      "from": "southern_africa_cw",
+      "to": "australia_cw",
+      "type": "sea"
+    },
+    {
+      "from": "uk_ireland",
+      "to": "france_benelux",
+      "type": "sea"
+    },
+    {
+      "from": "uk_ireland",
+      "to": "scandinavia_cw",
+      "type": "sea"
+    },
+    {
+      "from": "usa_northeast",
+      "to": "uk_ireland",
+      "type": "sea"
+    },
+    {
+      "from": "usa_northeast",
+      "to": "usa_south",
+      "type": "land"
+    },
+    {
+      "from": "usa_south",
+      "to": "usa_west_cw",
+      "type": "land"
+    },
+    {
+      "from": "usa_west_cw",
+      "to": "japan_cw",
+      "type": "sea"
+    },
+    {
+      "from": "vietnam_korea",
+      "to": "indonesia_cw",
       "type": "sea"
     }
   ],

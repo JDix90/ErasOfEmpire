@@ -11,10 +11,11 @@ interface AiAction {
 }
 
 const DIFFICULTY_CONFIG: Record<AiDifficulty, { depth: number; randomFactor: number }> = {
-  easy:   { depth: 1, randomFactor: 0.35 },
-  medium: { depth: 2, randomFactor: 0.15 },
-  hard:   { depth: 3, randomFactor: 0.05 },
-  expert: { depth: 4, randomFactor: 0.0  },
+  easy:     { depth: 1, randomFactor: 0.35 },
+  medium:   { depth: 2, randomFactor: 0.15 },
+  hard:     { depth: 3, randomFactor: 0.05 },
+  expert:   { depth: 4, randomFactor: 0.0  },
+  tutorial: { depth: 1, randomFactor: 0.9  },
 };
 
 /**
@@ -26,6 +27,28 @@ export function computeAiTurn(
   map: GameMap,
   difficulty: AiDifficulty
 ): AiAction[] {
+  // Tutorial AI: draft to random territory, never attack, skip fortify
+  if (difficulty === 'tutorial') {
+    const pid = state.players[state.current_player_index].player_id;
+    const owned = Object.entries(state.territories)
+      .filter(([, t]) => t.owner_id === pid)
+      .map(([id]) => id);
+    const continentBonus = calculateContinentBonuses(state, map, pid);
+    const player = state.players[state.current_player_index];
+    const reinforcements = calculateReinforcements(
+      player.territory_count,
+      continentBonus,
+      state.players.length,
+    );
+    const target = owned[Math.floor(Math.random() * owned.length)] ?? owned[0];
+    return [
+      ...(target ? [{ type: 'draft' as const, to: target, units: reinforcements }] : []),
+      { type: 'end_phase' as const },
+      { type: 'end_phase' as const },
+      { type: 'end_phase' as const },
+    ];
+  }
+
   const cfg = DIFFICULTY_CONFIG[difficulty];
   const actions: AiAction[] = [];
   const playerId = state.players[state.current_player_index].player_id;
@@ -33,7 +56,11 @@ export function computeAiTurn(
   // ── Draft Phase ──────────────────────────────────────────────────────────
   const continentBonus = calculateContinentBonuses(state, map, playerId);
   const player = state.players[state.current_player_index];
-  const reinforcements = calculateReinforcements(player.territory_count, continentBonus);
+  const reinforcements = calculateReinforcements(
+    player.territory_count,
+    continentBonus,
+    state.players.length,
+  );
 
   const draftTarget = selectDraftTarget(state, map, playerId, cfg.randomFactor);
   if (draftTarget) {

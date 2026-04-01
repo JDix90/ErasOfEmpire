@@ -765,9 +765,114 @@
   ],
   "connections": [
     {
+      "from": "aksum",
+      "to": "arabia",
+      "type": "sea"
+    },
+    {
+      "from": "anatolia",
+      "to": "greece",
+      "type": "land"
+    },
+    {
+      "from": "anatolia",
+      "to": "levant",
+      "type": "land"
+    },
+    {
+      "from": "anatolia",
+      "to": "mesopotamia",
+      "type": "land"
+    },
+    {
+      "from": "anatolia",
+      "to": "persia",
+      "type": "land"
+    },
+    {
+      "from": "arabia",
+      "to": "levant",
+      "type": "land"
+    },
+    {
+      "from": "arabia",
+      "to": "mesopotamia",
+      "type": "land"
+    },
+    {
+      "from": "bactria",
+      "to": "central_steppe",
+      "type": "land"
+    },
+    {
+      "from": "bactria",
+      "to": "kushan",
+      "type": "land"
+    },
+    {
       "from": "britannia",
       "to": "gaul",
       "type": "sea"
+    },
+    {
+      "from": "central_africa",
+      "to": "north_africa",
+      "type": "land"
+    },
+    {
+      "from": "central_africa",
+      "to": "west_africa",
+      "type": "land"
+    },
+    {
+      "from": "central_china",
+      "to": "northern_china",
+      "type": "land"
+    },
+    {
+      "from": "central_china",
+      "to": "southern_china",
+      "type": "land"
+    },
+    {
+      "from": "central_steppe",
+      "to": "eastern_steppe",
+      "type": "land"
+    },
+    {
+      "from": "central_steppe",
+      "to": "kushan",
+      "type": "land"
+    },
+    {
+      "from": "central_steppe",
+      "to": "persia",
+      "type": "land"
+    },
+    {
+      "from": "eastern_steppe",
+      "to": "manchuria",
+      "type": "land"
+    },
+    {
+      "from": "eastern_steppe",
+      "to": "northern_china",
+      "type": "land"
+    },
+    {
+      "from": "egypt",
+      "to": "levant",
+      "type": "land"
+    },
+    {
+      "from": "egypt",
+      "to": "north_africa",
+      "type": "land"
+    },
+    {
+      "from": "gaul",
+      "to": "germania",
+      "type": "land"
     },
     {
       "from": "gaul",
@@ -780,8 +885,28 @@
       "type": "land"
     },
     {
-      "from": "gaul",
-      "to": "germania",
+      "from": "germania",
+      "to": "sarmatia",
+      "type": "land"
+    },
+    {
+      "from": "greece",
+      "to": "egypt",
+      "type": "sea"
+    },
+    {
+      "from": "greece",
+      "to": "italia",
+      "type": "land"
+    },
+    {
+      "from": "greece",
+      "to": "levant",
+      "type": "sea"
+    },
+    {
+      "from": "greece",
+      "to": "pontic_steppe",
       "type": "land"
     },
     {
@@ -795,28 +920,13 @@
       "type": "sea"
     },
     {
-      "from": "italia",
-      "to": "greece",
+      "from": "kushan",
+      "to": "northern_india",
       "type": "land"
     },
     {
-      "from": "north_africa",
-      "to": "egypt",
-      "type": "land"
-    },
-    {
-      "from": "greece",
-      "to": "anatolia",
-      "type": "sea"
-    },
-    {
-      "from": "anatolia",
-      "to": "levant",
-      "type": "land"
-    },
-    {
-      "from": "levant",
-      "to": "egypt",
+      "from": "kushan",
+      "to": "persia",
       "type": "land"
     },
     {
@@ -825,88 +935,13 @@
       "type": "land"
     },
     {
-      "from": "mesopotamia",
-      "to": "persia",
-      "type": "land"
-    },
-    {
-      "from": "mesopotamia",
-      "to": "arabia",
-      "type": "land"
-    },
-    {
-      "from": "persia",
-      "to": "bactria",
-      "type": "land"
-    },
-    {
-      "from": "persia",
-      "to": "kushan",
-      "type": "land"
-    },
-    {
-      "from": "bactria",
-      "to": "kushan",
-      "type": "land"
-    },
-    {
-      "from": "bactria",
-      "to": "central_steppe",
-      "type": "land"
-    },
-    {
-      "from": "pontic_steppe",
-      "to": "central_steppe",
-      "type": "land"
-    },
-    {
-      "from": "central_steppe",
-      "to": "eastern_steppe",
-      "type": "land"
-    },
-    {
-      "from": "eastern_steppe",
+      "from": "manchuria",
       "to": "northern_china",
       "type": "land"
     },
     {
-      "from": "eastern_steppe",
-      "to": "manchuria",
-      "type": "land"
-    },
-    {
-      "from": "northern_china",
-      "to": "central_china",
-      "type": "land"
-    },
-    {
-      "from": "central_china",
-      "to": "southern_china",
-      "type": "land"
-    },
-    {
-      "from": "northern_china",
-      "to": "manchuria",
-      "type": "land"
-    },
-    {
-      "from": "northern_china",
-      "to": "kushan",
-      "type": "land"
-    },
-    {
-      "from": "kushan",
-      "to": "northern_india",
-      "type": "land"
-    },
-    {
-      "from": "northern_india",
-      "to": "southern_india",
-      "type": "land"
-    },
-    {
-      "from": "egypt",
-      "to": "aksum",
+      "from": "mesopotamia",
+      "to": "persia",
       "type": "land"
     },
     {
@@ -915,18 +950,8 @@
       "type": "land"
     },
     {
-      "from": "west_africa",
-      "to": "central_africa",
-      "type": "land"
-    },
-    {
-      "from": "central_africa",
-      "to": "aksum",
-      "type": "land"
-    },
-    {
-      "from": "anatolia",
-      "to": "pontic_steppe",
+      "from": "northern_india",
+      "to": "southern_india",
       "type": "land"
     },
     {
@@ -935,63 +960,8 @@
       "type": "land"
     },
     {
-      "from": "sarmatia",
-      "to": "germania",
-      "type": "land"
-    },
-    {
-      "from": "aksum",
-      "to": "arabia",
-      "type": "sea"
-    },
-    {
       "from": "southern_india",
       "to": "southern_china",
-      "type": "sea"
-    },
-    {
-      "from": "north_africa",
-      "to": "central_africa",
-      "type": "land"
-    },
-    {
-      "from": "greece",
-      "to": "pontic_steppe",
-      "type": "land"
-    },
-    {
-      "from": "anatolia",
-      "to": "mesopotamia",
-      "type": "land"
-    },
-    {
-      "from": "anatolia",
-      "to": "persia",
-      "type": "land"
-    },
-    {
-      "from": "levant",
-      "to": "arabia",
-      "type": "land"
-    },
-    {
-      "from": "persia",
-      "to": "central_steppe",
-      "type": "land"
-    },
-    {
-      "from": "central_steppe",
-      "to": "kushan",
-      "type": "land"
-    },
-    {
-      "from": "greece",
-      "to": "egypt",
-      "type": "sea"
-    },
-    {
-      "from": "greece",
-      "to": "levant",
       "type": "sea"
     }
   ],

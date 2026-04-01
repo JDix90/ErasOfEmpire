@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { sanitizePostAuthRedirect } from '../utils/navRedirect';
 
 export default function RegisterPage() {
   const [username, setUsername] = useState('');
@@ -11,6 +12,8 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const { register, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = sanitizePostAuthRedirect(searchParams.get('redirect'));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +24,7 @@ export default function RegisterPage() {
     try {
       await register(username, email, password);
       toast.success('Account created! Welcome, Commander!');
-      navigate('/lobby');
+      navigate(redirectTo);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const msg = err.response?.data?.error;
@@ -109,7 +112,12 @@ export default function RegisterPage() {
 
           <p className="text-center text-cc-muted text-sm mt-6">
             Already have an account?{' '}
-            <Link to="/login" className="text-cc-gold hover:underline">Sign in</Link>
+            <Link
+              to={redirectTo !== '/lobby' ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}
+              className="text-cc-gold hover:underline"
+            >
+              Sign in
+            </Link>
           </p>
         </div>
       </div>

@@ -32,9 +32,15 @@ export interface GameMap {
   map_id: string;
   name: string;
   description: string;
-  era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'custom';
+  era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
   canvas_width: number;
   canvas_height: number;
+  globe_view?: {
+    lock_rotation?: boolean;
+    center_lat?: number;
+    center_lng?: number;
+    altitude?: number;
+  };
   territories: Territory[];
   connections: Connection[];
   regions: Region[];
@@ -121,7 +127,7 @@ export async function getEraMapSummaries(): Promise<MapSummary[]> {
     }
   ).toArray();
 
-  return maps.map(m => ({
+  return maps.map((m: (typeof maps)[number]) => ({
     map_id:          m.map_id,
     name:            m.name,
     description:     m.description,
@@ -165,7 +171,7 @@ export async function getCommunityMaps(
   ]);
 
   return {
-    maps: maps.map(m => ({
+    maps: maps.map((m: (typeof maps)[number]) => ({
       map_id:          m.map_id,
       name:            m.name,
       description:     m.description,
@@ -257,7 +263,7 @@ export async function rateMap(mapId: string, rating: number): Promise<void> {
   const db = getDb();
   const doc = await db.collection('custommaps').findOne({ map_id: mapId }, { projection: { rating: 1, rating_count: 1 } });
   if (doc) {
-    const r = doc as { rating: number; rating_count: number };
+    const r = doc as unknown as { rating: number; rating_count: number };
     const newCount = (r.rating_count || 0) + 1;
     const newRating = ((r.rating || 0) * (r.rating_count || 0) + rating) / newCount;
     await db.collection('custommaps').updateOne(

@@ -33,8 +33,11 @@ export interface GameState {
     fog_of_war: boolean;
     turn_timer_seconds: number;
     diplomacy_enabled: boolean;
+    tutorial?: boolean;
+    tutorial_step?: number;
   };
-  draft_units_remaining: number;
+  /** Server-authoritative; may be absent on older saved games. */
+  draft_units_remaining?: number;
   turn_started_at: number;
   winner_id?: string;
   win_probability_history?: Array<{

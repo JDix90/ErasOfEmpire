@@ -12,12 +12,33 @@ import {
   syncTerritoryCounts,
   calculateContinentBonuses,
   appendWinProbabilitySnapshot,
+  repairDraftUnitsIfMissing,
 } from '../game-engine/state/gameStateManager';
 import { resolveCombat, calculateReinforcements } from '../game-engine/combat/combatResolver';
 import { computeAiTurn } from '../game-engine/ai/aiBot';
-import { recordGameResults } from '../game-engine/state/statsManager';
+import { recordGameResults, computeRanks } from '../game-engine/state/statsManager';
+import { checkAndUnlockAchievements } from '../game-engine/achievements/achievementService';
+import { pgPool } from '../db/postgres';
+import { INITIAL_MU, INITIAL_PHI } from '../game-engine/rating/ratingService';
+import { getTutorialMap } from '../game-engine/tutorial/tutorialScript';
 import type { GameState, GameMap, AiDifficulty } from '../types';
 import { config } from '../config';
+
+function loadMapFromDoc(mapDoc: any): GameMap {
+  return {
+    map_id: mapDoc.map_id,
+    name: mapDoc.name,
+    territories: mapDoc.territories,
+    connections: mapDoc.connections,
+    regions: mapDoc.regions,
+  };
+}
+
+async function resolveMap(mapId: string): Promise<GameMap | null> {
+  if (mapId === 'tutorial') return getTutorialMap();
+  const mapDoc = await CustomMap.findOne({ map_id: mapId }).lean();
+  return mapDoc ? loadMapFromDoc(mapDoc) : null;
+}
 
 // In-memory store: gameId → { state, map, connectedSockets }
 const activeGames = new Map<string, {
@@ -98,15 +119,9 @@ export function initGameSocket(httpServer: HttpServer): Server {
 
           if (savedState) {
             // Load map
-            const mapDoc = await CustomMap.findOne({ map_id: game.map_id }).lean();
-            if (mapDoc) {
-              const gameMap: GameMap = {
-                map_id: mapDoc.map_id,
-                name: mapDoc.name,
-                territories: mapDoc.territories,
-                connections: mapDoc.connections,
-                regions: mapDoc.regions,
-              };
+            const gameMap = await resolveMap(game.map_id);
+            if (gameMap) {
+              repairDraftUnitsIfMissing(savedState.state_json, gameMap);
               activeGames.set(gameId, {
                 state: savedState.state_json,
                 map: gameMap,
@@ -159,15 +174,8 @@ export function initGameSocket(httpServer: HttpServer): Server {
             if (!savedState) {
               return socket.emit('error', { message: 'Game state not found' });
             }
-            const mapDoc = await CustomMap.findOne({ map_id: game.map_id }).lean();
-            if (!mapDoc) return socket.emit('error', { message: 'Map not found' });
-            const gameMap: GameMap = {
-              map_id: mapDoc.map_id,
-              name: mapDoc.name,
-              territories: mapDoc.territories,
-              connections: mapDoc.connections,
-              regions: mapDoc.regions,
-            };
+            const gameMap = await resolveMap(game.map_id);
+            if (!gameMap) return socket.emit('error', { message: 'Map not found' });
             activeGames.set(gameId, {
               state: savedState.state_json,
               map: gameMap,
@@ -198,17 +206,9 @@ export function initGameSocket(httpServer: HttpServer): Server {
           [gameId]
         );
 
-        // Load map
-        const mapDoc = await CustomMap.findOne({ map_id: game.map_id }).lean();
-        if (!mapDoc) return socket.emit('error', { message: 'Map not found' });
-
-        const gameMap: GameMap = {
-          map_id: mapDoc.map_id,
-          name: mapDoc.name,
-          territories: mapDoc.territories,
-          connections: mapDoc.connections,
-          regions: mapDoc.regions,
-        };
+        // Load map (tutorial maps are hardcoded; others from Mongo)
+        const gameMap = await resolveMap(game.map_id);
+        if (!gameMap) return socket.emit('error', { message: 'Map not found' });
 
         const playerStates = players.map((p) => ({
           player_id: p.user_id ?? `ai_${p.player_index}`,
@@ -228,9 +228,9 @@ export function initGameSocket(httpServer: HttpServer): Server {
         const connectedSockets = new Map<string, string>();
         const socketsInRoom = await io.in(gameId).fetchSockets();
         for (const s of socketsInRoom) {
-          const ext = s as Socket & { userId?: string };
+          const ext = s as unknown as { id: string; userId?: string };
           if (ext.userId) {
-            connectedSockets.set(s.id, ext.userId);
+            connectedSockets.set(ext.id, ext.userId);
           }
         }
 
@@ -520,9 +520,27 @@ export function initGameSocket(httpServer: HttpServer): Server {
       broadcastState(io, gameId, state);
     });
 
+    // ── Matchmaking socket shortcuts ────────────────────────────────────────
+    socket.on('matchmaking:join', async ({ era_id, bucket }: { era_id: string; bucket: string }) => {
+      try {
+        await query(
+          `UPDATE ranked_queue SET socket_id = $1 WHERE user_id = $2`,
+          [socket.id, userId],
+        );
+      } catch { /* queue row may not exist yet */ }
+    });
+
+    socket.on('matchmaking:leave', async () => {
+      try {
+        await query('DELETE FROM ranked_queue WHERE user_id = $1', [userId]);
+      } catch { /* ignore */ }
+    });
+
     // ── Disconnect ──────────────────────────────────────────────────────────
     socket.on('disconnect', () => {
       console.log(`[Socket] Disconnected: ${userId} (${socket.id})`);
+      // Clean up matchmaking queue on disconnect
+      query('DELETE FROM ranked_queue WHERE socket_id = $1', [socket.id]).catch(() => {});
       for (const [gameId, room] of activeGames.entries()) {
         if (!room.connectedSockets.has(socket.id)) continue;
         room.connectedSockets.delete(socket.id);
@@ -618,8 +636,58 @@ async function finalizeGame(io: Server, gameId: string, state: GameState, winner
     ]);
     await saveGameState(gameId, state);
 
-    // Record post-game stats (XP, MMR, ranks) for all human players
-    await recordGameResults(gameId, state, winnerId);
+    // Record post-game stats (XP, ratings, ranks) for all human players
+    const resultCtx = await recordGameResults(gameId, state, winnerId);
+
+    // Check and unlock achievements
+    const unlockedByPlayer: Record<string, string[]> = {};
+    const humanPlayers = state.players.filter((p) => !p.is_ai);
+    const ranks = computeRanks(state.players, winnerId);
+
+    if (humanPlayers.length > 0) {
+      const client = await pgPool.connect();
+      try {
+        await client.query('BEGIN');
+        const ratingRows = (await client.query<{ user_id: string; mu: number; phi: number }>(
+          `SELECT user_id, mu, phi FROM user_ratings
+           WHERE user_id = ANY($1) AND rating_type = $2`,
+          [humanPlayers.map((p) => p.player_id), resultCtx.isRanked ? 'ranked' : 'solo'],
+        )).rows;
+        const ratingMap = new Map(ratingRows.map((r) => [r.user_id, { mu: r.mu, phi: r.phi }]));
+        const avgMu = ratingRows.length > 0
+          ? ratingRows.reduce((s, r) => s + r.mu, 0) / ratingRows.length
+          : INITIAL_MU;
+
+        const gameRow = await client.query<{ game_type: string; is_ranked: boolean }>(
+          'SELECT game_type, COALESCE(is_ranked, false) AS is_ranked FROM games WHERE game_id = $1',
+          [gameId],
+        );
+        const gameType = (gameRow.rows[0]?.game_type ?? 'solo') as 'solo' | 'multiplayer' | 'hybrid';
+
+        for (const p of humanPlayers) {
+          const myRating = ratingMap.get(p.player_id) ?? { mu: INITIAL_MU, phi: INITIAL_PHI };
+          const unlocked = await checkAndUnlockAchievements(client, {
+            userId: p.player_id,
+            gameId,
+            gameState: state,
+            winnerId,
+            rank: ranks.get(p.player_id) ?? state.players.length,
+            totalPlayers: state.players.length,
+            gameType,
+            isRanked: resultCtx.isRanked,
+            playerMu: myRating.mu,
+            opponentAvgMu: avgMu,
+          });
+          if (unlocked.length > 0) unlockedByPlayer[p.player_id] = unlocked;
+        }
+        await client.query('COMMIT');
+      } catch (achErr) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('[Socket] Achievement check failed:', achErr);
+      } finally {
+        client.release();
+      }
+    }
 
     const winner = state.players.find((p) => p.player_id === winnerId);
     const stats = {
@@ -635,6 +703,9 @@ async function finalizeGame(io: Server, gameId: string, state: GameState, winner
         is_ai: p.is_ai,
       })),
       win_probability_history: state.win_probability_history ?? [],
+      rating_deltas: Object.fromEntries(resultCtx.ratingDeltas),
+      is_ranked: resultCtx.isRanked,
+      achievements_unlocked: unlockedByPlayer,
     };
     io.to(gameId).emit('game:over', stats);
 

@@ -83,12 +83,19 @@ export function getCardSetBonus(redemptionCount: number): number {
 
 /**
  * Calculate the base reinforcement units for a player.
- * Minimum of 3 units guaranteed.
+ * Minimum of 3 units guaranteed (from territory count).
+ *
+ * Continent bonuses are scaled by active player count: with few players each side
+ * owns a larger share of the map, so full-region control (and stacked bonuses) is
+ * much more common than in a 6-player game. Reference size is 6 players.
  */
 export function calculateReinforcements(
   territoryCount: number,
-  continentBonuses: number
+  continentBonuses: number,
+  playerCount: number = 6
 ): number {
   const base = Math.max(3, Math.floor(territoryCount / 3));
-  return base + continentBonuses;
+  const pc = Math.max(2, Math.min(playerCount, 12));
+  const scaledContinent = Math.floor((continentBonuses * pc) / 6);
+  return base + scaledContinent;
 }

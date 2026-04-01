@@ -12,19 +12,19 @@
       "polygon": [
         [
           289.5,
-          178.0
+          178
         ],
         [
           364.5,
-          178.0
+          178
         ],
         [
           364.5,
-          258.0
+          258
         ],
         [
           289.5,
-          258.0
+          258
         ]
       ],
       "center_point": [
@@ -38,20 +38,20 @@
       "name": "Western United States",
       "polygon": [
         [
-          203.0,
-          168.0
+          203,
+          168
         ],
         [
-          293.0,
-          168.0
+          293,
+          168
         ],
         [
-          293.0,
-          258.0
+          293,
+          258
         ],
         [
-          203.0,
-          258.0
+          203,
+          258
         ]
       ],
       "center_point": [
@@ -65,19 +65,19 @@
       "name": "Canada",
       "polygon": [
         [
-          173.0,
+          173,
           57.5
         ],
         [
-          383.0,
+          383,
           57.5
         ],
         [
-          383.0,
+          383,
           172.5
         ],
         [
-          173.0,
+          173,
           172.5
         ]
       ],
@@ -93,19 +93,19 @@
       "polygon": [
         [
           197.5,
-          263.0
+          263
         ],
         [
           292.5,
-          263.0
+          263
         ],
         [
           292.5,
-          333.0
+          333
         ],
         [
           197.5,
-          333.0
+          333
         ]
       ],
       "center_point": [
@@ -120,19 +120,19 @@
       "polygon": [
         [
           277.5,
-          308.0
+          308
         ],
         [
           372.5,
-          308.0
+          308
         ],
         [
           372.5,
-          368.0
+          368
         ],
         [
           277.5,
-          368.0
+          368
         ]
       ],
       "center_point": [
@@ -146,19 +146,19 @@
       "name": "Colombia & Venezuela",
       "polygon": [
         [
-          313.0,
+          313,
           367.5
         ],
         [
-          403.0,
+          403,
           367.5
         ],
         [
-          403.0,
+          403,
           422.5
         ],
         [
-          313.0,
+          313,
           422.5
         ]
       ],
@@ -173,20 +173,20 @@
       "name": "Brazil",
       "polygon": [
         [
-          365.0,
-          403.0
+          365,
+          403
         ],
         [
-          475.0,
-          403.0
+          475,
+          403
         ],
         [
-          475.0,
-          513.0
+          475,
+          513
         ],
         [
-          365.0,
-          513.0
+          365,
+          513
         ]
       ],
       "center_point": [
@@ -254,19 +254,19 @@
       "name": "Chile & Paraguay",
       "polygon": [
         [
-          298.0,
+          298,
           497.5
         ],
         [
-          348.0,
+          348,
           497.5
         ],
         [
-          348.0,
+          348,
           632.5
         ],
         [
-          298.0,
+          298,
           632.5
         ]
       ],
@@ -281,19 +281,19 @@
       "name": "United Kingdom & Ireland",
       "polygon": [
         [
-          543.0,
+          543,
           82.5
         ],
         [
-          603.0,
+          603,
           82.5
         ],
         [
-          603.0,
+          603,
           147.5
         ],
         [
-          543.0,
+          543,
           147.5
         ]
       ],
@@ -309,19 +309,19 @@
       "polygon": [
         [
           557.5,
-          143.0
+          143
         ],
         [
           632.5,
-          143.0
+          143
         ],
         [
           632.5,
-          213.0
+          213
         ],
         [
           557.5,
-          213.0
+          213
         ]
       ],
       "center_point": [
@@ -389,19 +389,19 @@
       "name": "Spain & Portugal",
       "polygon": [
         [
-          523.0,
+          523,
           192.5
         ],
         [
-          593.0,
+          593,
           192.5
         ],
         [
-          593.0,
+          593,
           257.5
         ],
         [
-          523.0,
+          523,
           257.5
         ]
       ],
@@ -417,19 +417,19 @@
       "polygon": [
         [
           617.5,
-          173.0
+          173
         ],
         [
           672.5,
-          173.0
+          173
         ],
         [
           672.5,
-          243.0
+          243
         ],
         [
           617.5,
-          243.0
+          243
         ]
       ],
       "center_point": [
@@ -470,19 +470,19 @@
       "name": "Poland & Baltic States",
       "polygon": [
         [
-          683.0,
+          683,
           82.5
         ],
         [
-          753.0,
+          753,
           82.5
         ],
         [
-          753.0,
+          753,
           157.5
         ],
         [
-          683.0,
+          683,
           157.5
         ]
       ],
@@ -498,19 +498,19 @@
       "polygon": [
         [
           737.5,
-          103.0
+          103
         ],
         [
           812.5,
-          103.0
+          103
         ],
         [
           812.5,
-          173.0
+          173
         ],
         [
           737.5,
-          173.0
+          173
         ]
       ],
       "center_point": [
@@ -524,20 +524,20 @@
       "name": "Western Russia",
       "polygon": [
         [
-          763.0,
-          28.0
+          763,
+          28
         ],
         [
-          873.0,
-          28.0
+          873,
+          28
         ],
         [
-          873.0,
-          118.0
+          873,
+          118
         ],
         [
-          763.0,
-          118.0
+          763,
+          118
         ]
       ],
       "center_point": [
@@ -551,20 +551,20 @@
       "name": "Eastern Russia",
       "polygon": [
         [
-          873.0,
-          13.0
+          873,
+          13
         ],
         [
-          1083.0,
-          13.0
+          1083,
+          13
         ],
         [
-          1083.0,
-          113.0
+          1083,
+          113
         ],
         [
-          873.0,
-          113.0
+          873,
+          113
         ]
       ],
       "center_point": [
@@ -578,20 +578,20 @@
       "name": "Central Asia",
       "polygon": [
         [
-          813.0,
-          148.0
+          813,
+          148
         ],
         [
-          903.0,
-          148.0
+          903,
+          148
         ],
         [
-          903.0,
-          218.0
+          903,
+          218
         ],
         [
-          813.0,
-          218.0
+          813,
+          218
         ]
       ],
       "center_point": [
@@ -660,19 +660,19 @@
       "polygon": [
         [
           817.5,
-          213.0
+          213
         ],
         [
           892.5,
-          213.0
+          213
         ],
         [
           892.5,
-          283.0
+          283
         ],
         [
           817.5,
-          283.0
+          283
         ]
       ],
       "center_point": [
@@ -687,19 +687,19 @@
       "polygon": [
         [
           762.5,
-          288.0
+          288
         ],
         [
           847.5,
-          288.0
+          288
         ],
         [
           847.5,
-          358.0
+          358
         ],
         [
           762.5,
-          358.0
+          358
         ]
       ],
       "center_point": [
@@ -740,19 +740,19 @@
       "name": "North Africa",
       "polygon": [
         [
-          543.0,
+          543,
           247.5
         ],
         [
-          683.0,
+          683,
           247.5
         ],
         [
-          683.0,
+          683,
           312.5
         ],
         [
-          543.0,
+          543,
           312.5
         ]
       ],
@@ -767,20 +767,20 @@
       "name": "West Africa",
       "polygon": [
         [
-          523.0,
-          343.0
+          523,
+          343
         ],
         [
-          603.0,
-          343.0
+          603,
+          343
         ],
         [
-          603.0,
-          413.0
+          603,
+          413
         ],
         [
-          523.0,
-          413.0
+          523,
+          413
         ]
       ],
       "center_point": [
@@ -821,19 +821,19 @@
       "name": "Central Africa",
       "polygon": [
         [
-          653.0,
+          653,
           392.5
         ],
         [
-          733.0,
+          733,
           392.5
         ],
         [
-          733.0,
+          733,
           467.5
         ],
         [
-          653.0,
+          653,
           467.5
         ]
       ],
@@ -902,19 +902,19 @@
       "name": "Southern Africa",
       "polygon": [
         [
-          663.0,
+          663,
           467.5
         ],
         [
-          753.0,
+          753,
           467.5
         ],
         [
-          753.0,
+          753,
           572.5
         ],
         [
-          663.0,
+          663,
           572.5
         ]
       ],
@@ -929,19 +929,19 @@
       "name": "India",
       "polygon": [
         [
-          893.0,
+          893,
           262.5
         ],
         [
-          963.0,
+          963,
           262.5
         ],
         [
-          963.0,
+          963,
           367.5
         ],
         [
-          893.0,
+          893,
           367.5
         ]
       ],
@@ -984,19 +984,19 @@
       "polygon": [
         [
           912.5,
-          153.0
+          153
         ],
         [
           987.5,
-          153.0
+          153
         ],
         [
           987.5,
-          243.0
+          243
         ],
         [
           912.5,
-          243.0
+          243
         ]
       ],
       "center_point": [
@@ -1010,19 +1010,19 @@
       "name": "Eastern China",
       "polygon": [
         [
-          988.0,
+          988,
           157.5
         ],
         [
-          1058.0,
+          1058,
           157.5
         ],
         [
-          1058.0,
+          1058,
           262.5
         ],
         [
-          988.0,
+          988,
           262.5
         ]
       ],
@@ -1038,19 +1038,19 @@
       "polygon": [
         [
           1072.5,
-          173.0
+          173
         ],
         [
           1117.5,
-          173.0
+          173
         ],
         [
           1117.5,
-          253.0
+          253
         ],
         [
           1072.5,
-          253.0
+          253
         ]
       ],
       "center_point": [
@@ -1065,19 +1065,19 @@
       "polygon": [
         [
           1042.5,
-          153.0
+          153
         ],
         [
           1077.5,
-          153.0
+          153
         ],
         [
           1077.5,
-          213.0
+          213
         ],
         [
           1042.5,
-          213.0
+          213
         ]
       ],
       "center_point": [
@@ -1091,19 +1091,19 @@
       "name": "Southeast Asia",
       "polygon": [
         [
-          963.0,
+          963,
           327.5
         ],
         [
-          1043.0,
+          1043,
           327.5
         ],
         [
-          1043.0,
+          1043,
           402.5
         ],
         [
-          963.0,
+          963,
           402.5
         ]
       ],
@@ -1118,19 +1118,19 @@
       "name": "Indonesia & Philippines",
       "polygon": [
         [
-          1003.0,
+          1003,
           387.5
         ],
         [
-          1093.0,
+          1093,
           387.5
         ],
         [
-          1093.0,
+          1093,
           442.5
         ],
         [
-          1003.0,
+          1003,
           442.5
         ]
       ],
@@ -1145,19 +1145,19 @@
       "name": "Australia & New Zealand",
       "polygon": [
         [
-          1023.0,
+          1023,
           457.5
         ],
         [
-          1133.0,
+          1133,
           457.5
         ],
         [
-          1133.0,
+          1133,
           572.5
         ],
         [
-          1023.0,
+          1023,
           572.5
         ]
       ],
@@ -1170,68 +1170,8 @@
   ],
   "connections": [
     {
-      "from": "usa_east_mod",
-      "to": "usa_west_mod",
-      "type": "land"
-    },
-    {
-      "from": "usa_east_mod",
-      "to": "canada_mod",
-      "type": "land"
-    },
-    {
-      "from": "usa_west_mod",
-      "to": "canada_mod",
-      "type": "land"
-    },
-    {
-      "from": "usa_east_mod",
-      "to": "mexico_mod",
-      "type": "land"
-    },
-    {
-      "from": "usa_west_mod",
-      "to": "mexico_mod",
-      "type": "land"
-    },
-    {
-      "from": "mexico_mod",
-      "to": "central_america_mod",
-      "type": "land"
-    },
-    {
-      "from": "usa_east_mod",
-      "to": "central_america_mod",
-      "type": "sea"
-    },
-    {
-      "from": "central_america_mod",
-      "to": "colombia_mod",
-      "type": "land"
-    },
-    {
-      "from": "colombia_mod",
+      "from": "argentina_mod",
       "to": "brazil_mod",
-      "type": "land"
-    },
-    {
-      "from": "colombia_mod",
-      "to": "peru_mod",
-      "type": "land"
-    },
-    {
-      "from": "brazil_mod",
-      "to": "peru_mod",
-      "type": "land"
-    },
-    {
-      "from": "brazil_mod",
-      "to": "argentina_mod",
-      "type": "land"
-    },
-    {
-      "from": "peru_mod",
-      "to": "chile_mod",
       "type": "land"
     },
     {
@@ -1240,61 +1180,56 @@
       "type": "land"
     },
     {
-      "from": "peru_mod",
-      "to": "argentina_mod",
+      "from": "argentina_mod",
+      "to": "peru_mod",
       "type": "land"
     },
     {
-      "from": "uk_mod",
-      "to": "france_mod",
+      "from": "australia_mod",
+      "to": "brazil_mod",
+      "type": "land"
+    },
+    {
+      "from": "australia_mod",
+      "to": "central_africa_mod",
+      "type": "land"
+    },
+    {
+      "from": "australia_mod",
+      "to": "chile_mod",
       "type": "sea"
     },
     {
-      "from": "uk_mod",
-      "to": "scandinavia_mod",
-      "type": "sea"
+      "from": "australia_mod",
+      "to": "east_africa_mod",
+      "type": "land"
     },
     {
-      "from": "france_mod",
+      "from": "australia_mod",
+      "to": "peru_mod",
+      "type": "land"
+    },
+    {
+      "from": "australia_mod",
+      "to": "southern_africa_mod",
+      "type": "land"
+    },
+    {
+      "from": "balkans_mod",
       "to": "germany_mod",
       "type": "land"
     },
     {
-      "from": "france_mod",
-      "to": "iberia_mod",
-      "type": "land"
-    },
-    {
-      "from": "france_mod",
+      "from": "balkans_mod",
       "to": "italy_mod",
       "type": "land"
     },
     {
-      "from": "germany_mod",
-      "to": "scandinavia_mod",
-      "type": "sea"
-    },
-    {
-      "from": "germany_mod",
-      "to": "italy_mod",
-      "type": "land"
-    },
-    {
-      "from": "germany_mod",
+      "from": "balkans_mod",
       "to": "poland_baltics_mod",
       "type": "land"
     },
     {
-      "from": "germany_mod",
-      "to": "balkans_mod",
-      "type": "land"
-    },
-    {
-      "from": "italy_mod",
-      "to": "balkans_mod",
-      "type": "land"
-    },
-    {
       "from": "balkans_mod",
       "to": "turkey_mod",
       "type": "land"
@@ -1305,88 +1240,188 @@
       "type": "land"
     },
     {
-      "from": "poland_baltics_mod",
-      "to": "ukraine_mod",
+      "from": "brazil_mod",
+      "to": "chile_mod",
       "type": "land"
     },
     {
-      "from": "poland_baltics_mod",
-      "to": "russia_west_mod",
+      "from": "brazil_mod",
+      "to": "colombia_mod",
       "type": "land"
     },
     {
-      "from": "poland_baltics_mod",
-      "to": "scandinavia_mod",
+      "from": "brazil_mod",
+      "to": "france_mod",
+      "type": "land"
+    },
+    {
+      "from": "brazil_mod",
+      "to": "peru_mod",
+      "type": "land"
+    },
+    {
+      "from": "brazil_mod",
+      "to": "west_africa_mod",
       "type": "sea"
     },
     {
-      "from": "ukraine_mod",
-      "to": "russia_west_mod",
-      "type": "land"
-    },
-    {
-      "from": "ukraine_mod",
-      "to": "turkey_mod",
-      "type": "sea"
-    },
-    {
-      "from": "russia_west_mod",
+      "from": "canada_mod",
       "to": "russia_east_mod",
       "type": "land"
     },
     {
-      "from": "russia_west_mod",
-      "to": "central_asia_mod",
+      "from": "canada_mod",
+      "to": "usa_east_mod",
       "type": "land"
     },
     {
-      "from": "russia_west_mod",
-      "to": "scandinavia_mod",
+      "from": "canada_mod",
+      "to": "usa_west_mod",
       "type": "land"
     },
     {
-      "from": "russia_east_mod",
-      "to": "central_asia_mod",
+      "from": "central_africa_mod",
+      "to": "east_africa_mod",
       "type": "land"
     },
     {
-      "from": "russia_east_mod",
+      "from": "central_africa_mod",
+      "to": "maghreb_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_mod",
+      "to": "nigeria_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_mod",
+      "to": "southern_africa_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_mod",
+      "to": "sudan_horn_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_africa_mod",
+      "to": "west_africa_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_america_mod",
+      "to": "colombia_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_america_mod",
+      "to": "mexico_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_asia_mod",
+      "to": "china_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_asia_mod",
       "to": "china_west_mod",
       "type": "land"
     },
     {
-      "from": "russia_east_mod",
-      "to": "korea_mod",
+      "from": "central_asia_mod",
+      "to": "iran_mod",
       "type": "land"
     },
     {
-      "from": "russia_east_mod",
+      "from": "central_asia_mod",
+      "to": "pakistan_afghan_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_asia_mod",
+      "to": "russia_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "central_asia_mod",
+      "to": "russia_west_mod",
+      "type": "land"
+    },
+    {
+      "from": "chile_mod",
+      "to": "peru_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_east_mod",
+      "to": "china_west_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_east_mod",
       "to": "japan_mod",
       "type": "sea"
     },
     {
-      "from": "turkey_mod",
+      "from": "china_east_mod",
+      "to": "korea_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_east_mod",
+      "to": "russia_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_east_mod",
+      "to": "southeast_asia_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_west_mod",
+      "to": "india_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_west_mod",
+      "to": "pakistan_afghan_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_west_mod",
+      "to": "russia_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "china_west_mod",
+      "to": "southeast_asia_mod",
+      "type": "land"
+    },
+    {
+      "from": "colombia_mod",
+      "to": "france_mod",
+      "type": "land"
+    },
+    {
+      "from": "colombia_mod",
+      "to": "peru_mod",
+      "type": "land"
+    },
+    {
+      "from": "east_africa_mod",
+      "to": "southern_africa_mod",
+      "type": "land"
+    },
+    {
+      "from": "east_africa_mod",
+      "to": "sudan_horn_mod",
+      "type": "land"
+    },
+    {
+      "from": "egypt_mod",
       "to": "levant_mod",
-      "type": "land"
-    },
-    {
-      "from": "turkey_mod",
-      "to": "iran_mod",
-      "type": "land"
-    },
-    {
-      "from": "levant_mod",
-      "to": "egypt_mod",
-      "type": "land"
-    },
-    {
-      "from": "levant_mod",
-      "to": "iran_mod",
-      "type": "land"
-    },
-    {
-      "from": "levant_mod",
-      "to": "saudi_mod",
       "type": "land"
     },
     {
@@ -1405,9 +1440,69 @@
       "type": "land"
     },
     {
-      "from": "iran_mod",
-      "to": "saudi_mod",
+      "from": "france_mod",
+      "to": "germany_mod",
+      "type": "land"
+    },
+    {
+      "from": "france_mod",
+      "to": "iberia_mod",
+      "type": "land"
+    },
+    {
+      "from": "france_mod",
+      "to": "italy_mod",
+      "type": "land"
+    },
+    {
+      "from": "germany_mod",
+      "to": "italy_mod",
+      "type": "land"
+    },
+    {
+      "from": "germany_mod",
+      "to": "poland_baltics_mod",
+      "type": "land"
+    },
+    {
+      "from": "germany_mod",
+      "to": "scandinavia_mod",
+      "type": "land"
+    },
+    {
+      "from": "india_mod",
+      "to": "east_africa_mod",
       "type": "sea"
+    },
+    {
+      "from": "india_mod",
+      "to": "pakistan_afghan_mod",
+      "type": "land"
+    },
+    {
+      "from": "india_mod",
+      "to": "southeast_asia_mod",
+      "type": "land"
+    },
+    {
+      "from": "indonesia_mod",
+      "to": "australia_mod",
+      "type": "sea"
+    },
+    {
+      "from": "indonesia_mod",
+      "to": "japan_mod",
+      "type": "sea"
+    },
+    {
+      "from": "indonesia_mod",
+      "to": "southeast_asia_mod",
+      "type": "land"
+    },
+    {
+      "from": "iran_mod",
+      "to": "levant_mod",
+      "type": "land"
     },
     {
       "from": "iran_mod",
@@ -1416,17 +1511,32 @@
     },
     {
       "from": "iran_mod",
-      "to": "central_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "saudi_mod",
-      "to": "sudan_horn_mod",
+      "to": "saudi_mod",
       "type": "sea"
     },
     {
-      "from": "maghreb_mod",
-      "to": "west_africa_mod",
+      "from": "iran_mod",
+      "to": "turkey_mod",
+      "type": "land"
+    },
+    {
+      "from": "japan_mod",
+      "to": "korea_mod",
+      "type": "sea"
+    },
+    {
+      "from": "korea_mod",
+      "to": "russia_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "levant_mod",
+      "to": "saudi_mod",
+      "type": "land"
+    },
+    {
+      "from": "levant_mod",
+      "to": "turkey_mod",
       "type": "land"
     },
     {
@@ -1436,112 +1546,87 @@
     },
     {
       "from": "maghreb_mod",
-      "to": "sudan_horn_mod",
+      "to": "west_africa_mod",
       "type": "land"
     },
     {
-      "from": "west_africa_mod",
-      "to": "nigeria_mod",
+      "from": "mexico_mod",
+      "to": "usa_east_mod",
+      "type": "land"
+    },
+    {
+      "from": "mexico_mod",
+      "to": "usa_west_mod",
       "type": "land"
     },
     {
       "from": "nigeria_mod",
-      "to": "central_africa_mod",
+      "to": "west_africa_mod",
       "type": "land"
     },
     {
-      "from": "central_africa_mod",
-      "to": "east_africa_mod",
+      "from": "poland_baltics_mod",
+      "to": "russia_west_mod",
       "type": "land"
     },
     {
-      "from": "central_africa_mod",
-      "to": "southern_africa_mod",
+      "from": "poland_baltics_mod",
+      "to": "scandinavia_mod",
+      "type": "sea"
+    },
+    {
+      "from": "poland_baltics_mod",
+      "to": "ukraine_mod",
       "type": "land"
     },
     {
-      "from": "central_africa_mod",
-      "to": "sudan_horn_mod",
-      "type": "land"
-    },
-    {
-      "from": "east_africa_mod",
-      "to": "sudan_horn_mod",
-      "type": "land"
-    },
-    {
-      "from": "east_africa_mod",
-      "to": "southern_africa_mod",
-      "type": "land"
-    },
-    {
-      "from": "pakistan_afghan_mod",
-      "to": "india_mod",
-      "type": "land"
-    },
-    {
-      "from": "pakistan_afghan_mod",
-      "to": "central_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "pakistan_afghan_mod",
-      "to": "china_west_mod",
-      "type": "land"
-    },
-    {
-      "from": "india_mod",
-      "to": "china_west_mod",
-      "type": "land"
-    },
-    {
-      "from": "india_mod",
-      "to": "china_east_mod",
-      "type": "land"
-    },
-    {
-      "from": "india_mod",
-      "to": "southeast_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_west_mod",
-      "to": "china_east_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_west_mod",
-      "to": "central_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_east_mod",
-      "to": "korea_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_east_mod",
-      "to": "southeast_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_east_mod",
+      "from": "russia_east_mod",
       "to": "japan_mod",
       "type": "sea"
     },
     {
-      "from": "japan_mod",
-      "to": "korea_mod",
+      "from": "russia_east_mod",
+      "to": "russia_west_mod",
+      "type": "land"
+    },
+    {
+      "from": "russia_east_mod",
+      "to": "scandinavia_mod",
+      "type": "land"
+    },
+    {
+      "from": "russia_west_mod",
+      "to": "scandinavia_mod",
+      "type": "land"
+    },
+    {
+      "from": "russia_west_mod",
+      "to": "ukraine_mod",
+      "type": "land"
+    },
+    {
+      "from": "saudi_mod",
+      "to": "sudan_horn_mod",
       "type": "sea"
     },
     {
-      "from": "southeast_asia_mod",
-      "to": "indonesia_mod",
+      "from": "uk_mod",
+      "to": "france_mod",
       "type": "sea"
     },
     {
-      "from": "indonesia_mod",
-      "to": "australia_mod",
+      "from": "uk_mod",
+      "to": "scandinavia_mod",
+      "type": "sea"
+    },
+    {
+      "from": "ukraine_mod",
+      "to": "turkey_mod",
+      "type": "sea"
+    },
+    {
+      "from": "usa_east_mod",
+      "to": "central_america_mod",
       "type": "sea"
     },
     {
@@ -1550,63 +1635,8 @@
       "type": "sea"
     },
     {
-      "from": "brazil_mod",
-      "to": "west_africa_mod",
-      "type": "sea"
-    },
-    {
-      "from": "canada_mod",
-      "to": "russia_east_mod",
-      "type": "sea"
-    },
-    {
-      "from": "india_mod",
-      "to": "east_africa_mod",
-      "type": "sea"
-    },
-    {
-      "from": "australia_mod",
-      "to": "chile_mod",
-      "type": "sea"
-    },
-    {
-      "from": "indonesia_mod",
-      "to": "japan_mod",
-      "type": "sea"
-    },
-    {
-      "from": "russia_east_mod",
-      "to": "china_east_mod",
-      "type": "land"
-    },
-    {
-      "from": "central_asia_mod",
-      "to": "china_east_mod",
-      "type": "land"
-    },
-    {
-      "from": "china_west_mod",
-      "to": "southeast_asia_mod",
-      "type": "land"
-    },
-    {
-      "from": "brazil_mod",
-      "to": "chile_mod",
-      "type": "land"
-    },
-    {
-      "from": "balkans_mod",
-      "to": "poland_baltics_mod",
-      "type": "land"
-    },
-    {
-      "from": "maghreb_mod",
-      "to": "central_africa_mod",
-      "type": "land"
-    },
-    {
-      "from": "west_africa_mod",
-      "to": "central_africa_mod",
+      "from": "usa_east_mod",
+      "to": "usa_west_mod",
       "type": "land"
     }
   ],

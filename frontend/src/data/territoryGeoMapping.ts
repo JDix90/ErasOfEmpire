@@ -202,6 +202,34 @@ export const TERRITORY_GEO_CONFIG: Record<string, TerritoryGeoConfig> = {
     { iso: 'CN', clip_bbox: [105, 18, 135, 50] },
     { iso: 'TW' },
   ],
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AMERICAN CIVIL WAR — each territory_id MUST map to real geography for that
+  // name (Natural Earth US polygon ∩ bbox). Keys are NOT ordered by abstract
+  // map grid — never assign “row 0 west→east” boxes to unrelated ids (that put
+  // Kentucky in the Rockies and Missouri in the Southwest on the globe).
+  //
+  // Bboxes are tight CONUS partitions; borders touch but do not overlap.
+  // Reference: approximate state bounds (1860s CONUS = lower 48; HI/AK excluded).
+  // ═══════════════════════════════════════════════════════════════════════════
+  acw_new_england:   [{ iso: 'US', clip_bbox: [-73.6, 41.0, -66.9, 47.5] }], // ME NH VT MA RI CT
+  acw_mid_atlantic:  [{ iso: 'US', clip_bbox: [-80.6, 38.8, -73.5, 42.5] }], // NY NJ PA DE MD
+  acw_great_lakes:   [{ iso: 'US', clip_bbox: [-92.2, 41.0, -80.5, 49.0] }], // MI WI northern IL + north OH/IN
+  acw_appalachia:    [{ iso: 'US', clip_bbox: [-82.5, 37.0, -77.2, 40.6] }], // WV (split from KY at -82.5°W)
+  acw_upper_south:   [{ iso: 'US', clip_bbox: [-83.6, 36.5, -75.6, 39.6] }], // VA + MD south of PA
+  acw_carolinas:     [{ iso: 'US', clip_bbox: [-82.5, 32.0, -78.0, 34.9] }], // NC SC (split from GA at 35°N)
+  acw_ohio_indiana:  [{ iso: 'US', clip_bbox: [-88.6, 38.4, -80.5, 40.95] }], // OH IN (below Great Lakes 41°N band)
+  acw_kentucky:      [{ iso: 'US', clip_bbox: [-89.6, 36.5, -82.5, 39.2] }], // KY
+  acw_tennessee:     [{ iso: 'US', clip_bbox: [-90.4, 34.9, -81.6, 36.7] }], // TN
+  acw_georgia_fl:    [{ iso: 'US', clip_bbox: [-85.6, 24.5, -79.8, 35.0] }], // GA FL (north edge meets Carolinas at 35°N)
+  acw_alabama:       [{ iso: 'US', clip_bbox: [-88.6, 30.2, -84.8, 35.0] }], // AL
+  acw_mississippi:   [{ iso: 'US', clip_bbox: [-91.7, 30.2, -88.0, 35.0] }], // MS (state + river corridor)
+  acw_plains:        [{ iso: 'US', clip_bbox: [-104.1, 40.0, -95.9, 49.0] }], // ND SD NE KS (Great Plains)
+  acw_missouri:      [{ iso: 'US', clip_bbox: [-95.9, 36.0, -89.1, 40.6] }], // MO
+  acw_arkansas:      [{ iso: 'US', clip_bbox: [-94.6, 33.0, -89.8, 36.0] }], // AR (below MO)
+  acw_louisiana:     [{ iso: 'US', clip_bbox: [-94.1, 28.9, -88.8, 33.1] }], // LA + Gulf coast
+  acw_texas:         [{ iso: 'US', clip_bbox: [-106.6, 25.8, -93.5, 36.5] }], // TX
+  acw_far_west:      [{ iso: 'US', clip_bbox: [-125.0, 31.0, -106.6, 49.0] }], // CA OR WA NV AZ NM UT CO MT WY ID
 };
 
 /** Simple territory → ISO codes (no clipping). Used when TERRITORY_GEO_CONFIG has no entry. */

@@ -1,6 +1,6 @@
 /**
  * ChronoConquest — Era Selector Component
- * Displays the 5 built-in historical era maps as selectable cards.
+ * Displays built-in historical era maps as selectable cards.
  * Fetches live territory counts and descriptions from the API.
  */
 
@@ -35,7 +35,7 @@ export default function EraSelector({ selectedEra, onSelect }: EraSelectorProps)
   if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {[1,2,3,4,5,6].map(i => (
+        {[1,2,3,4,5,6,7,8].map(i => (
           <div key={i} className="h-32 bg-gray-800 rounded-lg animate-pulse" />
         ))}
       </div>
@@ -121,4 +121,6 @@ const FALLBACK_ERA_SUMMARIES: MapSummary[] = [
   { map_id: 'era_ww2',       name: 'World War II (1939–1945)',   description: '', era_theme: 'ww2',       territory_count: 35, region_count: 8, is_public: true, play_count: 0, avg_rating: 0, creator_id: 'system' },
   { map_id: 'era_coldwar',   name: 'Cold War (1947–1991)',       description: '', era_theme: 'coldwar',   territory_count: 44, region_count: 8, is_public: true, play_count: 0, avg_rating: 0, creator_id: 'system' },
   { map_id: 'era_modern',    name: 'The Modern Day',             description: '', era_theme: 'modern',    territory_count: 43, region_count: 8, is_public: true, play_count: 0, avg_rating: 0, creator_id: 'system' },
+  { map_id: 'era_acw',       name: 'American Civil War (1861–1865)', description: '', era_theme: 'acw', territory_count: 18, region_count: 6, is_public: true, play_count: 0, avg_rating: 0, creator_id: 'system' },
+  { map_id: 'era_risorgimento', name: 'Italian Unification (1859–1871)', description: '', era_theme: 'risorgimento', territory_count: 14, region_count: 6, is_public: true, play_count: 0, avg_rating: 0, creator_id: 'system' },
 ];

@@ -12,6 +12,8 @@ export interface CombatModalData {
   type: 'combat';
   result: CombatResult;
   perspective?: 'attacker' | 'defender';
+  /** Same attack can be rolled again (not captured, enough attackers left) */
+  repeatAttack?: { fromId: string; toId: string };
 }
 
 export interface TurnSummaryModalData {
@@ -46,6 +48,9 @@ export interface GameOverModalData {
     is_ai: boolean;
   }>;
   win_probability_history?: WinProbabilitySnapshot[];
+  rating_change?: number;
+  is_ranked?: boolean;
+  achievements_unlocked?: string[];
 }
 
 export interface EliminationModalData {
@@ -119,7 +124,19 @@ function DieFace({ value, index, variant }: { value: number; index: number; vari
 
 // ─── Combat Result View ────────────────────────────────────────────────────
 
-function CombatResultView({ result, perspective, onDismiss }: { result: CombatResult; perspective?: 'attacker' | 'defender'; onDismiss: () => void }) {
+function CombatResultView({
+  result,
+  perspective,
+  onDismiss,
+  repeatAttack,
+  onRepeatAttack,
+}: {
+  result: CombatResult;
+  perspective?: 'attacker' | 'defender';
+  onDismiss: () => void;
+  repeatAttack?: { fromId: string; toId: string };
+  onRepeatAttack?: () => void;
+}) {
   const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
@@ -136,7 +153,7 @@ function CombatResultView({ result, perspective, onDismiss }: { result: CombatRe
   const headerIcon = isDefending ? 'text-orange-400' : 'text-red-400';
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full min-w-0">
       {/* Header */}
       <div className="text-center mb-8">
         <div className={clsx('inline-flex items-center gap-2 px-5 py-2 rounded-full border mb-4', headerBg)}>
@@ -242,8 +259,23 @@ function CombatResultView({ result, perspective, onDismiss }: { result: CombatRe
           </div>
         )}
 
+        {/* Repeat same attack (attacker only, failed capture, enough troops) */}
+        {showResult && onRepeatAttack && repeatAttack && !result.territory_captured && perspective === 'attacker' && (
+          <button
+            type="button"
+            onClick={onRepeatAttack}
+            className="w-full mb-3 py-3 rounded-xl bg-cc-gold/15 hover:bg-cc-gold/25 border border-cc-gold/40
+                       text-cc-gold font-medium transition-all duration-200
+                       flex items-center justify-center gap-2"
+          >
+            <Sword className="w-4 h-4" />
+            Attack again (same battle)
+          </button>
+        )}
+
         {/* Continue */}
         <button
+          type="button"
           onClick={onDismiss}
           className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/[0.15] border border-white/10
                      text-white font-medium transition-all duration-200
@@ -308,7 +340,7 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
       title: 'Reinforcements',
       accentClass: 'text-emerald-400',
       render: () => (
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           <div className="text-center mb-5">
             <span className="text-4xl font-bold text-emerald-400 tabular-nums">+{totalReinforced}</span>
             <p className="text-white/40 text-sm mt-1">troops deployed</p>
@@ -334,8 +366,8 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
       title: isOwnTurn ? 'Your Battles' : `${playerName}'s Battles`,
       accentClass: 'text-red-400',
       render: () => (
-        <div>
-          <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="w-full">
+          <div className="grid grid-cols-3 gap-3 mb-5 w-full">
             <StaggerItem index={0}>
               <div className="p-3 rounded-xl bg-red-500/[0.06] border border-red-500/10 text-center">
                 <Sword className="w-5 h-5 mx-auto mb-1.5 text-red-400" />
@@ -358,7 +390,7 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
               </div>
             </StaggerItem>
           </div>
-          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+          <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 w-full">
             {combats.map((c, i) => (
               <StaggerItem key={i} index={i + 3}>
                 <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/[0.04] text-sm">
@@ -391,7 +423,7 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
       title: 'Fortifications',
       accentClass: 'text-sky-400',
       render: () => (
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           <div className="text-center mb-5">
             <span className="text-4xl font-bold text-sky-400 tabular-nums">{totalFortified}</span>
             <p className="text-white/40 text-sm mt-1">troops moved</p>
@@ -468,7 +500,7 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
 
   if (!slide) {
     return (
-      <div className="w-full max-w-sm text-center py-6">
+      <div className="w-full max-w-sm mx-auto text-center py-6">
         <p className="text-white/50 text-sm">Turn summary unavailable.</p>
         <button type="button" onClick={onDismiss} className="mt-4 w-full py-3 rounded-xl bg-white/10 border border-white/10 text-white font-medium">
           Continue
@@ -478,7 +510,7 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
   }
 
   return (
-    <div className="w-full max-w-lg" onClick={() => setAutoPaused(true)}>
+    <div className="w-full min-w-0" onClick={() => setAutoPaused(true)}>
       {/* Header */}
       <div className="text-center mb-5">
         <div className={clsx(
@@ -505,11 +537,11 @@ function TurnSummaryView({ data, onDismiss }: { data: TurnSummaryModalData; onDi
       </div>
 
       {/* Slide Content */}
-      <div className="relative overflow-hidden min-h-[200px]">
+      <div className="relative overflow-hidden min-h-[200px] w-full">
         <div
           key={slide.id}
           className={clsx(
-            'transition-all duration-300',
+            'transition-all duration-300 w-full',
             animating
               ? direction === 'right' ? 'opacity-0 -translate-x-8' : 'opacity-0 translate-x-8'
               : 'opacity-100 translate-x-0'
@@ -658,7 +690,7 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
   const probHistory = data.win_probability_history;
 
   return (
-    <div className="w-full max-w-lg text-center">
+    <div className="w-full min-w-0 text-center">
       {/* Trophy / Skull Animation */}
       <div className={clsx('mb-6 transition-all duration-700', showContent ? 'opacity-100 scale-100' : 'opacity-0 scale-50')}>
         {data.isWinner ? (
@@ -692,7 +724,7 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
 
       {/* Stats */}
       <div className={clsx(
-        'grid grid-cols-2 gap-3 mb-6 transition-all duration-500 delay-400',
+        `grid ${data.rating_change != null ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mb-6 transition-all duration-500 delay-400`,
         showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       )}>
         <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
@@ -703,6 +735,14 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
           <p className="text-2xl font-bold text-white tabular-nums">{data.players.length}</p>
           <p className="text-white/35 text-xs">Players</p>
         </div>
+        {data.rating_change != null && (
+          <div className="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+            <p className={clsx('text-2xl font-bold tabular-nums', data.rating_change >= 0 ? 'text-green-400' : 'text-red-400')}>
+              {data.rating_change >= 0 ? '+' : ''}{data.rating_change}
+            </p>
+            <p className="text-white/35 text-xs">{data.is_ranked ? 'Ranked' : 'Solo'} Rating</p>
+          </div>
+        )}
       </div>
 
       {probHistory && probHistory.length >= 2 && (
@@ -738,6 +778,25 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
         </div>
       </div>
 
+      {/* Achievements unlocked */}
+      {data.achievements_unlocked && data.achievements_unlocked.length > 0 && (
+        <div className={clsx(
+          'mb-6 transition-all duration-500 delay-500',
+          showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        )}>
+          <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-3">Medals Earned</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {data.achievements_unlocked.map((id) => (
+              <div key={id} className="px-3 py-1.5 rounded-lg bg-yellow-500/10
+                          border border-yellow-500/20 text-yellow-300 text-xs
+                          font-medium animate-fade-in">
+                {id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Buttons */}
       <div className={clsx(
         'flex gap-3 transition-all duration-500 delay-600',
@@ -760,7 +819,7 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
 
 function EliminationView({ data, onDismiss }: { data: EliminationModalData; onDismiss: () => void }) {
   return (
-    <div className="w-full max-w-sm text-center">
+    <div className="w-full max-w-md mx-auto text-center">
       <Skull className={clsx('w-14 h-14 mx-auto mb-4', data.isSelf ? 'text-red-400' : 'text-white/30')} />
       <h2 className={clsx('text-2xl font-bold font-display mb-2', data.isSelf ? 'text-red-400' : 'text-white')}>
         {data.isSelf ? 'You Have Been Eliminated' : 'Player Eliminated'}
@@ -796,7 +855,7 @@ function EliminationView({ data, onDismiss }: { data: EliminationModalData; onDi
 
 function ResignConfirmView({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
-    <div className="w-full max-w-sm text-center">
+    <div className="w-full max-w-md mx-auto text-center">
       <Flag className="w-12 h-12 text-white/30 mx-auto mb-4" />
       <h2 className="text-xl font-bold font-display text-white mb-2">Resign Game?</h2>
       <p className="text-white/50 text-sm mb-6">
@@ -828,9 +887,11 @@ interface ActionModalProps {
   data: ModalData | null;
   onDismiss: () => void;
   onResignConfirm?: () => void;
+  /** Re-roll the same attack after a failed capture (attacker still has 2+ on source) */
+  onRepeatCombat?: (fromId: string, toId: string) => void;
 }
 
-export default function ActionModal({ data, onDismiss, onResignConfirm }: ActionModalProps) {
+export default function ActionModal({ data, onDismiss, onResignConfirm, onRepeatCombat }: ActionModalProps) {
   const isGameOver = data?.type === 'game_over';
   const isResign = data?.type === 'resign_confirm';
 
@@ -859,13 +920,28 @@ export default function ActionModal({ data, onDismiss, onResignConfirm }: Action
       onClick={allowBackdropDismiss ? onDismiss : undefined}
     >
       <div
-        className="relative px-6 sm:px-8 py-8 rounded-2xl border border-white/[0.08] shadow-2xl animate-modal-in max-h-[min(90vh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem))] overflow-y-auto w-full max-w-[min(100%,42rem)]"
+        className="relative px-6 sm:px-8 py-8 rounded-2xl border border-white/[0.08] shadow-2xl animate-modal-in max-h-[min(90vh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem))] overflow-y-auto w-full min-w-0 max-w-[min(100%,42rem)]"
         style={{
           background: 'linear-gradient(180deg, rgba(30,35,50,0.97) 0%, rgba(15,17,23,0.98) 100%)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {data.type === 'combat' && <CombatResultView result={data.result} perspective={data.perspective} onDismiss={onDismiss} />}
+        {data.type === 'combat' && (
+          <CombatResultView
+            result={data.result}
+            perspective={data.perspective}
+            onDismiss={onDismiss}
+            repeatAttack={data.repeatAttack}
+            onRepeatAttack={
+              data.repeatAttack && onRepeatCombat
+                ? () => {
+                    onDismiss();
+                    onRepeatCombat(data.repeatAttack!.fromId, data.repeatAttack!.toId);
+                  }
+                : undefined
+            }
+          />
+        )}
         {data.type === 'turn_summary' && (
           <TurnSummaryView
             key={`turn-summary-${data.turnNumber}-${data.playerName}-${data.isOwnTurn ? 'me' : 'opp'}-${data.combats.length}-${data.reinforcements?.length ?? 0}-${data.fortifications?.length ?? 0}-${(data.combats ?? []).map((c) => `${c.fromName ?? ''}->${c.toName ?? ''}`).join(';')}`}

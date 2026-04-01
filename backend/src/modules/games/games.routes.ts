@@ -5,8 +5,13 @@ import { authenticate } from '../../middleware/authenticate';
 import { query, queryOne } from '../../db/postgres';
 import type { GameSettings, EraId, VictoryType } from '../../types';
 
+/** Optional body for POST /tutorial/start — default matches lobby quick-start (small tutorial map). */
+const TutorialStartSchema = z.object({
+  era: z.enum(['ancient', 'ww2']).optional(),
+});
+
 const CreateGameSchema = z.object({
-  era_id: z.enum(['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern']),
+  era_id: z.enum(['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'acw', 'risorgimento']),
   map_id: z.string().min(1).max(128),
   max_players: z.number().int().min(2).max(8),
   settings: z.object({
@@ -60,6 +65,50 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     return reply.status(201).send({ game_id: gameId, era_id, map_id, settings, game_type: gameType });
+  });
+
+  // ── POST /api/games/tutorial/start ────────────────────────────────────────
+  fastify.post('/tutorial/start', { preHandler: authenticate }, async (request, reply) => {
+    const parsed = TutorialStartSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid input', details: parsed.error.flatten() });
+    }
+    const useWw2 = parsed.data.era === 'ww2';
+    const mapId = useWw2 ? 'era_ww2' : 'tutorial';
+    const eraId = useWw2 ? 'ww2' : 'ancient';
+
+    const gameId = uuidv4();
+    const tutorialSettings = {
+      fog_of_war: false,
+      victory_type: 'domination',
+      turn_timer_seconds: 0,
+      initial_unit_count: 3,
+      card_set_escalating: false,
+      diplomacy_enabled: false,
+      tutorial: true,
+      tutorial_step: 0,
+      max_players: 2,
+    };
+
+    await query(
+      `INSERT INTO games (game_id, map_id, era_id, status, settings_json, game_type)
+       VALUES ($1, $2, $3, 'waiting', $4, 'solo')`,
+      [gameId, mapId, eraId, JSON.stringify(tutorialSettings)],
+    );
+
+    const colors = ['#3498db', '#e74c3c'];
+    await query(
+      `INSERT INTO game_players (game_id, user_id, player_index, player_color, is_ai)
+       VALUES ($1, $2, 0, $3, false)`,
+      [gameId, request.userId, colors[0]],
+    );
+    await query(
+      `INSERT INTO game_players (game_id, user_id, player_index, player_color, is_ai, ai_difficulty)
+       VALUES ($1, NULL, 1, $2, true, 'tutorial')`,
+      [gameId, colors[1]],
+    );
+
+    return reply.status(201).send({ game_id: gameId });
   });
 
   // ── GET /api/games/public ────────────────────────────────────────────────

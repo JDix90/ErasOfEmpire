@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authenticate } from '../../middleware/authenticate';
 import { CustomMap } from '../../db/mongo/MapModel';
 import { getMapById, getEraMapSummaries, getCommunityMaps, incrementPlayCount, rateMap } from './mapService';
+import { getTutorialMap } from '../../game-engine/tutorial/tutorialScript';
 
 const ClipBboxSchema = z.tuple([z.number(), z.number(), z.number(), z.number()]);
 
@@ -125,14 +126,14 @@ export async function mapsRoutes(fastify: FastifyInstance): Promise<void> {
     const filter: Record<string, unknown> = { is_public: true, moderation_status: 'approved' };
     if (era) filter.era_theme = era;
 
-    const sortField = sort === 'plays' ? { play_count: -1 } : sort === 'new' ? { created_at: -1 } : { rating: -1 };
+    let listQuery = CustomMap.find(filter).select(
+      'map_id name description era_theme rating rating_count play_count creator_id created_at',
+    );
+    if (sort === 'plays') listQuery = listQuery.sort({ play_count: -1 });
+    else if (sort === 'new') listQuery = listQuery.sort({ created_at: -1 });
+    else listQuery = listQuery.sort({ rating: -1 });
 
-    const maps = await CustomMap.find(filter)
-      .select('map_id name description era_theme rating rating_count play_count creator_id created_at')
-      .sort(sortField)
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const maps = await listQuery.skip(skip).limit(limit).lean();
 
     const total = await CustomMap.countDocuments(filter);
     return reply.send({ maps, total, page: pageNum, pages: Math.ceil(total / limit) });
@@ -151,6 +152,11 @@ export async function mapsRoutes(fastify: FastifyInstance): Promise<void> {
   // Handles both era maps (era_*) and custom maps
   fastify.get<{ Params: { mapId: string } }>('/:mapId', async (request, reply) => {
     const { mapId } = request.params;
+
+    // Hardcoded tutorial island (same geometry as gameSocket resolveMap('tutorial'))
+    if (mapId === 'tutorial') {
+      return reply.send({ map: getTutorialMap() });
+    }
 
     // Era maps are served from MongoDB via mapService (with Redis caching)
     if (mapId.startsWith('era_')) {

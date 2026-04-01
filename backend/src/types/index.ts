@@ -2,11 +2,11 @@
 // Shared backend types for ChronoConquest
 // ============================================================
 
-export type EraId = 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern';
+export type EraId = 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento';
 export type GameStatus = 'waiting' | 'in_progress' | 'completed' | 'abandoned';
 export type GamePhase = 'draft' | 'attack' | 'fortify' | 'game_over';
 export type VictoryType = 'domination' | 'secret_mission' | 'capital' | 'threshold';
-export type AiDifficulty = 'easy' | 'medium' | 'hard' | 'expert';
+export type AiDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'tutorial';
 export type ConnectionType = 'land' | 'sea';
 export type DiplomacyStatus = 'neutral' | 'truce' | 'nap' | 'war';
 
@@ -87,6 +87,8 @@ export interface GameSettings {
   initial_unit_count: number;
   card_set_escalating: boolean;
   diplomacy_enabled: boolean;
+  tutorial?: boolean;
+  tutorial_step?: number;
 }
 
 /** Snapshots for end-of-game win-probability chart (territory + army blend, renormalized). */

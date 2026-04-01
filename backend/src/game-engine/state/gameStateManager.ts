@@ -60,7 +60,11 @@ export function initializeGameState(
 
   const firstPlayer = playerStates[0];
   const continentBonus = calculateContinentBonusesForPlayer(territories, map, firstPlayer.player_id);
-  const initialDraft = calculateReinforcements(firstPlayer.territory_count, continentBonus);
+  const initialDraft = calculateReinforcements(
+    firstPlayer.territory_count,
+    continentBonus,
+    playerStates.length,
+  );
 
   const state: GameState = {
     game_id: gameId,
@@ -218,10 +222,20 @@ export function advanceToNextPlayer(state: GameState, map?: GameMap): void {
   state.phase = 'draft';
   state.turn_started_at = Date.now();
 
+  const nextPlayer = state.players[next];
   if (map) {
-    const nextPlayer = state.players[next];
     const bonus = calculateContinentBonusesForPlayer(state.territories, map, nextPlayer.player_id);
-    state.draft_units_remaining = calculateReinforcements(nextPlayer.territory_count, bonus);
+    state.draft_units_remaining = calculateReinforcements(
+      nextPlayer.territory_count,
+      bonus,
+      state.players.length,
+    );
+  } else {
+    state.draft_units_remaining = calculateReinforcements(
+      nextPlayer.territory_count,
+      0,
+      state.players.length,
+    );
   }
 
   appendWinProbabilitySnapshot(state);
@@ -235,6 +249,28 @@ export function advanceToNextPlayer(state: GameState, map?: GameMap): void {
       }
     }
   }
+}
+
+/**
+ * Older saved games may omit draft_units_remaining. Restore it when resuming in draft phase.
+ */
+export function repairDraftUnitsIfMissing(state: GameState, map: GameMap): void {
+  if (state.phase !== 'draft') return;
+  if (
+    state.draft_units_remaining != null &&
+    typeof state.draft_units_remaining === 'number' &&
+    !Number.isNaN(state.draft_units_remaining)
+  ) {
+    return;
+  }
+  const p = state.players[state.current_player_index];
+  if (!p) return;
+  const bonus = calculateContinentBonusesForPlayer(state.territories, map, p.player_id);
+  state.draft_units_remaining = calculateReinforcements(
+    p.territory_count,
+    bonus,
+    state.players.length,
+  );
 }
 
 /**

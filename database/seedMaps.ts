@@ -4,6 +4,9 @@
  * CustomMap model that the game server uses, ensuring perfect schema alignment.
  *
  * Usage (from project root):
+ *   pnpm run seed:maps
+ *
+ * Or from backend folder:
  *   cd backend && pnpm run seed:maps
  *
  * Or directly:
@@ -43,6 +46,13 @@ const RegionSchema = new mongoose.Schema({
   bonus:     { type: Number, required: true },
 }, { _id: false });
 
+const GlobeViewSchema = new mongoose.Schema({
+  lock_rotation: { type: Boolean },
+  center_lat:    { type: Number },
+  center_lng:    { type: Number },
+  altitude:      { type: Number },
+}, { _id: false });
+
 const MapSchema = new mongoose.Schema({
   map_id:            { type: String, required: true, unique: true },
   creator_id:        { type: String, required: true, default: 'system' },
@@ -50,6 +60,9 @@ const MapSchema = new mongoose.Schema({
   description:       { type: String, default: '' },
   era_theme:         { type: String, default: '' },
   background_image_url: { type: String, default: '' },
+  canvas_width:      { type: Number, default: 1200 },
+  canvas_height:     { type: Number, default: 700 },
+  globe_view:        { type: GlobeViewSchema, required: false },
   territories:       { type: [TerritorySchema], required: true },
   connections:       { type: [ConnectionSchema], required: true },
   regions:           { type: [RegionSchema], required: true },
@@ -73,6 +86,8 @@ const MAP_FILES = [
   'era_ww2.json',
   'era_coldwar.json',
   'era_modern.json',
+  'era_acw.json',
+  'era_risorgimento.json',
 ];
 
 const MAPS_DIR = path.resolve(__dirname, 'maps');
@@ -115,6 +130,7 @@ async function seedMaps(): Promise<void> {
       background_image_url: '',
       canvas_width:      data.canvas_width ?? 1200,
       canvas_height:     data.canvas_height ?? 700,
+      globe_view:        data.globe_view ?? undefined,
       territories:       data.territories,
       connections:       data.connections,
       regions:           data.regions,
@@ -140,6 +156,7 @@ async function seedMaps(): Promise<void> {
               era_theme:         doc.era_theme,
               canvas_width:      doc.canvas_width,
               canvas_height:     doc.canvas_height,
+              globe_view:        doc.globe_view,
               territories:       doc.territories,
               connections:       doc.connections,
               regions:           doc.regions,

@@ -8,18 +8,24 @@ import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react'
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import { FastForward } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
+import { type TerritoryGeoConfig, type ClipBbox } from '../../data/territoryGeoMapping';
 import {
-  TERRITORY_ISO_MAP,
-  TERRITORY_GEO_CONFIG,
-  type TerritoryGeoConfig,
-  type ClipBbox,
-} from '../../data/territoryGeoMapping';
-import { clipToBbox } from '../../utils/geoClip';
+  buildTerritoryGlobeGeometries,
+  type PolygonData,
+} from '../../utils/globeTerritoryGeometry';
+import { deriveRegionalGlobeView, type GlobeViewConfig } from '../../utils/regionalGlobe';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const COUNTRIES_GEOJSON_URL =
   'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_0_countries.geojson';
+
+/** US states/provinces (admin-1) — used for ACW territory outlines along real state borders */
+const STATES_GEOJSON_URL =
+  'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_1_states_provinces.geojson';
+
+/** Pre-extracted NE 10m Italy + San Marino + Vatican provinces (built from Natural Earth) */
+const RISORGIMENTO_GEOJSON_URL = '/geo/risorgimento_admin1.json';
 
 const PLAYER_COLORS: Record<string, string> = {
   '#e74c3c': 'rgba(231, 76, 60, 0.82)',
@@ -62,8 +68,11 @@ interface MapTerritory {
 }
 
 interface GameMapData {
+  map_id?: string;
   canvas_width?: number;
   canvas_height?: number;
+  /** Optional globe camera: used for regional / single-theater maps */
+  globe_view?: GlobeViewConfig;
   territories: MapTerritory[];
   connections: Array<{ from: string; to: string; type: 'land' | 'sea' }>;
 }
@@ -77,12 +86,6 @@ interface GlobeMapProps {
   onEventDone?: (eventId: string) => void;
   /** Lighter motion (mobile / accessibility): no idle globe spin resume after animations */
   reducedEffects?: boolean;
-}
-
-interface PolygonData {
-  territory_id: string;
-  name: string;
-  geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon;
 }
 
 interface HtmlDatum {
@@ -118,39 +121,6 @@ interface RingDatum {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function canvasToGeoJSON(
-  polygon: number[][],
-  canvasW: number,
-  canvasH: number
-): [number, number][] {
-  return polygon.map(([x, y]) => {
-    const lng = (x / canvasW) * 360 - 180;
-    const lat = 90 - (y / canvasH) * 180;
-    return [lng, lat];
-  });
-}
-
-function getPolygonCoordinates(
-  geom: GeoJSON.Polygon | GeoJSON.MultiPolygon
-): GeoJSON.Position[][][] {
-  if (geom.type === 'Polygon') return [geom.coordinates];
-  return geom.coordinates;
-}
-
-function mergeGeometries(
-  geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[]
-): GeoJSON.MultiPolygon {
-  const polygons: GeoJSON.Position[][][] = [];
-  for (const geom of geometries) {
-    for (const poly of getPolygonCoordinates(geom)) {
-      if (poly && poly[0] && poly[0].length >= 4) {
-        polygons.push(poly);
-      }
-    }
-  }
-  return { type: 'MultiPolygon', coordinates: polygons };
-}
 
 function computeCentroid(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon): { lat: number; lng: number } {
   let sumLng = 0, sumLat = 0, count = 0;
@@ -247,6 +217,11 @@ export default function GlobeMap({
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const { gameState, selectedTerritory, attackSource } = useGameStore();
   const [countriesGeo, setCountriesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [statesGeo, setStatesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  /** Italy province polygons for era_risorgimento */
+  const [risorgimentoGeo, setRisorgimentoGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  /** Bumps when react-globe.gl calls onGlobeReady so we can apply camera after the ref exists */
+  const [globeReadyTick, setGlobeReadyTick] = useState(0);
 
   // Animation layer state
   const [overlays, setOverlays] = useState<HtmlDatum[]>([]);
@@ -270,9 +245,6 @@ export default function GlobeMap({
     });
   }, []);
 
-  const canvasW = mapData.canvas_width ?? 1200;
-  const canvasH = mapData.canvas_height ?? 700;
-
   useEffect(() => {
     fetch(COUNTRIES_GEOJSON_URL)
       .then((r) => r.json())
@@ -280,102 +252,45 @@ export default function GlobeMap({
       .catch((err) => console.warn('Failed to load countries GeoJSON:', err));
   }, []);
 
+  useEffect(() => {
+    fetch(STATES_GEOJSON_URL)
+      .then((r) => r.json())
+      .then(setStatesGeo)
+      .catch((err) => {
+        console.warn('Failed to load US states GeoJSON:', err);
+        setStatesGeo({ type: 'FeatureCollection', features: [] });
+      });
+  }, []);
+
+  const needsRisorgimentoGeo =
+    mapData.map_id === 'era_risorgimento' ||
+    mapData.territories.some((t) => t.territory_id.startsWith('ris_'));
+
+  useEffect(() => {
+    if (!needsRisorgimentoGeo) {
+      setRisorgimentoGeo(null);
+      return;
+    }
+    fetch(RISORGIMENTO_GEOJSON_URL)
+      .then((r) => r.json())
+      .then(setRisorgimentoGeo)
+      .catch((err) => {
+        console.warn('Failed to load Risorgimento GeoJSON:', err);
+        setRisorgimentoGeo({ type: 'FeatureCollection', features: [] });
+      });
+  }, [needsRisorgimentoGeo]);
+
   // ── Polygon data (territories) ─────────────────────────────────────────
 
-  const polygonsData = useMemo((): PolygonData[] => {
-    const isoToFeatures = new Map<string, GeoJSON.Feature[]>();
-    if (countriesGeo?.features) {
-      for (const f of countriesGeo.features) {
-        const props = f.properties ?? {};
-        const iso = props['ISO_A2'] ?? props['iso_a2'];
-        const isoEH = props['ISO_A2_EH'] ?? props['iso_a2_eh'];
-        const code = (iso && iso !== '-99') ? iso : (isoEH && isoEH !== '-99') ? isoEH : null;
-        if (code && typeof code === 'string') {
-          const list = isoToFeatures.get(code) ?? [];
-          list.push(f);
-          isoToFeatures.set(code, list);
-        }
-      }
-    }
-
-    return mapData.territories.map((territory) => {
-      const geoConfig =
-        territory.geo_config ??
-        TERRITORY_GEO_CONFIG[territory.territory_id];
-      const isoCodes = territory.iso_codes ?? TERRITORY_ISO_MAP[territory.territory_id];
-      const useGeo = (geoConfig && geoConfig.length > 0) || (isoCodes && isoCodes.length > 0);
-      const hasData = useGeo && countriesGeo && isoToFeatures.size > 0;
-
-      if (hasData) {
-        let geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[] = [];
-
-        if (geoConfig && geoConfig.length > 0) {
-          for (const item of geoConfig) {
-            const features = isoToFeatures.get(item.iso) ?? [];
-            for (const f of features) {
-              const geom = f.geometry;
-              if (!geom || (geom.type !== 'Polygon' && geom.type !== 'MultiPolygon')) continue;
-              const g = geom as GeoJSON.Polygon | GeoJSON.MultiPolygon;
-              if (item.clip_bbox) {
-                const clipped = clipToBbox(g, item.clip_bbox);
-                if (clipped) geometries.push(clipped);
-              } else {
-                geometries.push(g);
-              }
-            }
-          }
-        } else if (isoCodes && isoCodes.length > 0) {
-          for (const code of isoCodes) {
-            const features = isoToFeatures.get(code) ?? [];
-            for (const f of features) {
-              const geom = f.geometry;
-              if (geom && (geom.type === 'Polygon' || geom.type === 'MultiPolygon')) {
-                geometries.push(geom as GeoJSON.Polygon | GeoJSON.MultiPolygon);
-              }
-            }
-          }
-          if (geometries.length > 0 && territory.clip_bbox) {
-            const merged = mergeGeometries(geometries);
-            const clipped = clipToBbox(merged, territory.clip_bbox);
-            geometries = clipped ? [clipped] : [];
-          }
-        }
-
-        if (geometries.length > 0) {
-          const merged = geometries.length === 1 && geometries[0].type === 'Polygon'
-            ? geometries[0]
-            : mergeGeometries(geometries);
-          return {
-            territory_id: territory.territory_id,
-            name: territory.name,
-            geometry: merged,
-          };
-        }
-      }
-
-      if (territory.geo_polygon && territory.geo_polygon.length >= 3) {
-        const ring: [number, number][] = [...territory.geo_polygon];
-        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
-          ring.push([...ring[0]]);
-        }
-        return {
-          territory_id: territory.territory_id,
-          name: territory.name,
-          geometry: { type: 'Polygon' as const, coordinates: [ring] },
-        };
-      }
-
-      const coords = canvasToGeoJSON(territory.polygon, canvasW, canvasH);
-      if (coords.length > 1 && (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1])) {
-        coords.push([...coords[0]]);
-      }
-      return {
-        territory_id: territory.territory_id,
-        name: territory.name,
-        geometry: { type: 'Polygon' as const, coordinates: [coords] },
-      };
-    });
-  }, [mapData, countriesGeo, canvasW, canvasH]);
+  const polygonsData = useMemo(
+    (): PolygonData[] =>
+      buildTerritoryGlobeGeometries(mapData, {
+        countriesGeo,
+        statesGeo,
+        risorgimentoGeo,
+      }),
+    [mapData, countriesGeo, statesGeo, risorgimentoGeo],
+  );
 
   // ── Territory center lookup ────────────────────────────────────────────
 
@@ -389,6 +304,13 @@ export default function GlobeMap({
 
   const territoryCentersRef = useRef(territoryCenters);
   territoryCentersRef.current = territoryCenters;
+
+  const regionalGlobe = useMemo(
+    () => deriveRegionalGlobeView(mapData.globe_view, territoryCenters),
+    [mapData.globe_view, territoryCenters],
+  );
+  const regionalGlobeRef = useRef(regionalGlobe);
+  regionalGlobeRef.current = regionalGlobe;
 
   // ── Animation helpers ──────────────────────────────────────────────────
 
@@ -433,16 +355,39 @@ export default function GlobeMap({
   }, []);
 
   const scheduleAutoRotateResume = useCallback(() => {
-    if (reducedEffects) return;
+    if (reducedEffects || regionalGlobeRef.current.lockRotation) return;
     clearTimeout(autoRotateTimerRef.current);
     autoRotateTimerRef.current = setTimeout(() => {
       const ctrl = globeRef.current?.controls?.();
-      if (ctrl) {
+      if (ctrl && !regionalGlobeRef.current.lockRotation) {
         ctrl.autoRotate = true;
         ctrl.autoRotateSpeed = 0.4;
       }
     }, 2500);
   }, [reducedEffects]);
+
+  // Regional maps: fixed camera, no idle spin; world maps: rotate when not in combat anim
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const ctrl = globe.controls?.();
+    if (!ctrl) return;
+
+    const lock = regionalGlobe.lockRotation || reducedEffects;
+    ctrl.autoRotate = !lock;
+    ctrl.autoRotateSpeed = lock ? 0 : 0.4;
+
+    globe.pointOfView(
+      {
+        lat: regionalGlobe.centerLat,
+        lng: regionalGlobe.centerLng,
+        altitude: regionalGlobe.altitude,
+      },
+      0,
+    );
+  }, [regionalGlobe, reducedEffects, globeReadyTick]);
+
+  const polygonExtrusion = regionalGlobe.lockRotation ? 0.005 : 0.008;
 
   // ── Animation sequences ────────────────────────────────────────────────
 
@@ -453,7 +398,9 @@ export default function GlobeMap({
     if (!center) { playNextRef.current(); return; }
 
     pauseAutoRotate();
-    panCamera(center.lat, center.lng, 1.5);
+    if (!regionalGlobeRef.current.lockRotation) {
+      panCamera(center.lat, center.lng, 1.5);
+    }
 
     const color = event.playerColor ?? '#4ade80';
     const plusId = uid('reinforce-plus');
@@ -513,12 +460,14 @@ export default function GlobeMap({
 
     pauseAutoRotate();
 
-    // Camera: if we have both territories, show midpoint; otherwise focus target
-    if (sourceCenter) {
-      const view = cameraViewForTwo(sourceCenter, targetCenter);
-      panCamera(view.lat, view.lng, view.altitude);
-    } else {
-      panCamera(targetCenter.lat, targetCenter.lng, 1.8);
+    // World maps: frame the action. Regional (locked) maps: keep the user’s camera.
+    if (!regionalGlobeRef.current.lockRotation) {
+      if (sourceCenter) {
+        const view = cameraViewForTwo(sourceCenter, targetCenter);
+        panCamera(view.lat, view.lng, view.altitude);
+      } else {
+        panCamera(targetCenter.lat, targetCenter.lng, 1.8);
+      }
     }
 
     const atkColor = event.attackerColor ?? '#ef4444';
@@ -661,11 +610,13 @@ export default function GlobeMap({
 
     pauseAutoRotate();
 
-    if (srcCenter) {
-      const view = cameraViewForTwo(srcCenter, destCenter);
-      panCamera(view.lat, view.lng, view.altitude);
-    } else {
-      panCamera(destCenter.lat, destCenter.lng, 1.5);
+    if (!regionalGlobeRef.current.lockRotation) {
+      if (srcCenter) {
+        const view = cameraViewForTwo(srcCenter, destCenter);
+        panCamera(view.lat, view.lng, view.altitude);
+      } else {
+        panCamera(destCenter.lat, destCenter.lng, 1.5);
+      }
     }
 
     const color = event.playerColor ?? '#38bdf8';
@@ -989,7 +940,7 @@ export default function GlobeMap({
         polygonCapColor={getPolygonColor}
         polygonSideColor={() => 'rgba(0, 0, 0, 0.2)'}
         polygonStrokeColor={getPolygonStroke}
-        polygonAltitude={0.008}
+        polygonAltitude={polygonExtrusion}
         polygonLabel={(p) => (p as PolygonData).name}
         onPolygonClick={(polygon) => polygon && onTerritoryClick((polygon as PolygonData).territory_id)}
 
@@ -1024,11 +975,7 @@ export default function GlobeMap({
         ringRepeatPeriod={ringAccessors.repeatPeriod}
 
         onGlobeReady={() => {
-          const ctrl = globeRef.current?.controls?.();
-          if (ctrl && !reducedEffects) {
-            ctrl.autoRotate = true;
-            ctrl.autoRotateSpeed = 0.4;
-          }
+          setGlobeReadyTick((t) => t + 1);
         }}
       />
     </div>

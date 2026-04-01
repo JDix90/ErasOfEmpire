@@ -3,8 +3,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { Plus, LogOut, User, Map, Globe, Play, Clock, Trash2 } from 'lucide-react';
+import {
+  Plus, LogOut, User, Map, Globe, Play, Clock, Trash2, Shield, Zap, Timer, GraduationCap, Bot,
+  Home, FileText, PenSquare,
+} from 'lucide-react';
 import axios from 'axios';
+import { getSocketUrl } from '../config/env';
+import { io as ioClient, Socket as IOSocket } from 'socket.io-client';
 
 const ERAS = [
   { id: 'ancient',   label: 'Ancient World'   },
@@ -13,6 +18,8 @@ const ERAS = [
   { id: 'ww2',       label: 'World War II'    },
   { id: 'coldwar',   label: 'Cold War'        },
   { id: 'modern',    label: 'The Modern Day'  },
+  { id: 'acw',       label: 'American Civil War' },
+  { id: 'risorgimento', label: 'Italian Unification' },
 ];
 
 const ERA_MAP_IDS: Record<string, string> = {
@@ -22,6 +29,8 @@ const ERA_MAP_IDS: Record<string, string> = {
   ww2:       'era_ww2',
   coldwar:   'era_coldwar',
   modern:    'era_modern',
+  acw:       'era_acw',
+  risorgimento: 'era_risorgimento',
 };
 
 interface PublicGame {
@@ -56,6 +65,8 @@ const ERA_LABELS: Record<string, string> = {
   ww2: 'World War II',
   coldwar: 'Cold War',
   modern: 'Modern Day',
+  acw: 'American Civil War',
+  risorgimento: 'Italian Unification',
 };
 
 function timeAgo(dateStr: string): string {
@@ -84,6 +95,13 @@ export default function LobbyPage() {
   const resolvedEra = presetEra ?? eraFromMap ?? null;
   const validEra = ERAS.some((e) => e.id === resolvedEra) ? resolvedEra! : null;
   const [showCreate, setShowCreate] = useState(!!validEra || !!presetMap);
+  const [lobbyTab, setLobbyTab] = useState<'casual' | 'ranked'>('casual');
+
+  // Ranked matchmaking state
+  const [rankedQueued, setRankedQueued] = useState(false);
+  const [rankedBucket, setRankedBucket] = useState('');
+  const [rankedEra, setRankedEra] = useState('ancient');
+  const [queueElapsed, setQueueElapsed] = useState(0);
 
   // Create game form state
   const [selectedEra, setSelectedEra] = useState(validEra ?? 'ww2');
@@ -104,6 +122,51 @@ export default function LobbyPage() {
     const interval = setInterval(fetchPublicGames, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Ranked matchmaking socket + queue timer
+  useEffect(() => {
+    if (lobbyTab !== 'ranked') return;
+    const token = useAuthStore.getState().accessToken;
+    if (!token) return;
+
+    const socketUrl = getSocketUrl();
+    const sock: IOSocket = socketUrl
+      ? ioClient(socketUrl, { auth: { token }, transports: ['websocket'] })
+      : ioClient({ auth: { token }, transports: ['websocket'] });
+
+    sock.on('matchmaking:found', ({ game_id }: { game_id: string }) => {
+      setRankedQueued(false);
+      toast.success('Match found!');
+      navigate(`/game/${game_id}`);
+    });
+
+    return () => { sock.disconnect(); };
+  }, [lobbyTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!rankedQueued) { setQueueElapsed(0); return; }
+    const t = setInterval(() => setQueueElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [rankedQueued]);
+
+  const joinRankedQueue = async (bucket: string) => {
+    try {
+      await api.post('/matchmaking/join', { era_id: rankedEra, bucket });
+      setRankedQueued(true);
+      setRankedBucket(bucket);
+      setQueueElapsed(0);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) toast.error(err.response?.data?.error || 'Failed to join queue');
+    }
+  };
+
+  const leaveRankedQueue = async () => {
+    try {
+      await api.delete('/matchmaking/leave');
+    } finally {
+      setRankedQueued(false);
+    }
+  };
 
   const fetchPublicGames = async () => {
     try {
@@ -186,17 +249,28 @@ export default function LobbyPage() {
   return (
     <div className="min-h-screen bg-cc-dark">
       {/* Top Bar */}
-      <nav className="border-b border-cc-border px-6 py-4 flex items-center justify-between pt-safe px-safe">
-        <Link to="/lobby" className="font-display text-xl text-cc-gold tracking-widest hover:text-white transition-colors">CHRONOCONQUEST</Link>
-        <div className="flex items-center gap-4">
+      <nav className="border-b border-cc-border px-4 sm:px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-safe px-safe">
+        <Link to="/lobby" className="font-display text-xl text-cc-gold tracking-widest hover:text-white transition-colors shrink-0">
+          CHRONOCONQUEST
+        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 justify-end">
           <Link to="/maps" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">
-            <Map className="w-4 h-4" /> Map Hub
+            <Map className="w-4 h-4 shrink-0" /> Map Hub
+          </Link>
+          <Link to="/editor" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">
+            <PenSquare className="w-4 h-4 shrink-0" /> Map Editor
           </Link>
           <Link to="/profile" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">
-            <User className="w-4 h-4" /> {user?.username}
+            <User className="w-4 h-4 shrink-0" /> {user?.username ?? 'Profile'}
           </Link>
-          <button onClick={handleLogout} className="flex items-center gap-1.5 text-cc-muted hover:text-red-400 text-sm transition-colors">
-            <LogOut className="w-4 h-4" /> Logout
+          <Link to="/privacy" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">
+            <FileText className="w-4 h-4 shrink-0" /> Privacy
+          </Link>
+          <Link to="/" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">
+            <Home className="w-4 h-4 shrink-0" /> Home
+          </Link>
+          <button type="button" onClick={handleLogout} className="flex items-center gap-1.5 text-cc-muted hover:text-red-400 text-sm transition-colors">
+            <LogOut className="w-4 h-4 shrink-0" /> Logout
           </button>
         </div>
       </nav>
@@ -206,7 +280,7 @@ export default function LobbyPage() {
         <div className="card mb-8 flex items-center justify-between">
           <div>
             <h2 className="font-display text-2xl text-cc-gold">Welcome, {user?.username}</h2>
-            <p className="text-cc-muted text-sm mt-1">Level {user?.level} · MMR {user?.mmr} · {user?.xp} XP</p>
+            <p className="text-cc-muted text-sm mt-1">Level {user?.level} · Ranked {(user as any)?.ratings?.ranked?.display ?? user?.mmr ?? '—'} · {user?.xp} XP</p>
           </div>
           <div className="flex gap-3">
             <button onClick={() => setShowCreate(!showCreate)} className="btn-primary flex items-center gap-2">
@@ -218,8 +292,113 @@ export default function LobbyPage() {
           </div>
         </div>
 
+        {/* Quick-start cards for new users */}
+        {user && user.xp === 0 && lobbyTab === 'casual' && (
+          <div className="card mb-6 animate-fade-in border-cc-gold/20">
+            <h3 className="font-display text-lg text-cc-gold mb-4 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5" /> Getting Started
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.post('/games/tutorial/start');
+                    navigate(`/game/${res.data.game_id}`);
+                  } catch { toast.error('Failed to start tutorial'); }
+                }}
+                className="p-4 rounded-lg bg-cc-dark border border-cc-gold/20 hover:border-cc-gold
+                           transition-colors text-left group"
+              >
+                <GraduationCap className="w-6 h-6 text-cc-gold mb-2" />
+                <p className="font-display text-cc-gold group-hover:text-white transition-colors">Learn the Basics</p>
+                <p className="text-cc-muted text-xs mt-1">Interactive tutorial match against a scripted AI.</p>
+              </button>
+              <button
+                onClick={() => { setShowCreate(true); setAiCount(3); setSelectedEra('ancient'); }}
+                className="p-4 rounded-lg bg-cc-dark border border-cc-border hover:border-cc-gold
+                           transition-colors text-left group"
+              >
+                <Bot className="w-6 h-6 text-cc-gold mb-2" />
+                <p className="font-display text-cc-gold group-hover:text-white transition-colors">Quick Solo Match</p>
+                <p className="text-cc-muted text-xs mt-1">1v3 AI in the Ancient World — a 20-min game.</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Casual / Ranked Tab Strip */}
+        <div className="flex gap-1 mb-6 p-1 bg-cc-dark rounded-lg w-fit border border-cc-border">
+          {(['casual', 'ranked'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => { setLobbyTab(tab); if (tab === 'casual' && rankedQueued) leaveRankedQueue(); }}
+              className={`flex items-center gap-1.5 px-5 py-2 rounded-md text-sm font-medium transition-all ${
+                lobbyTab === tab
+                  ? 'bg-cc-gold/15 text-cc-gold border border-cc-gold/30'
+                  : 'text-cc-muted hover:text-cc-text border border-transparent'
+              }`}
+            >
+              {tab === 'casual' ? <Globe className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
+              {tab === 'casual' ? 'Casual' : 'Ranked'}
+            </button>
+          ))}
+        </div>
+
+        {/* Ranked Matchmaking Panel */}
+        {lobbyTab === 'ranked' && (
+          <div className="card mb-8 animate-fade-in">
+            <h3 className="font-display text-xl text-cc-gold mb-2 flex items-center gap-2">
+              <Shield className="w-5 h-5" /> Ranked 1v1 Matchmaking
+            </h3>
+            <p className="text-cc-muted text-sm mb-6">
+              1v1 domination. No AI. No fog of war. Rating changes apply.
+            </p>
+
+            <div className="mb-4">
+              <label className="label">Era</label>
+              <select className="input max-w-xs" value={rankedEra} onChange={(e) => setRankedEra(e.target.value)} disabled={rankedQueued}>
+                {ERAS.map((era) => (
+                  <option key={era.id} value={era.id}>{era.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {rankedQueued ? (
+              <div className="flex items-center gap-4 p-4 bg-cc-dark rounded-lg border border-cc-gold/20">
+                <div className="animate-pulse text-cc-gold">
+                  <Timer className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-cc-text text-sm font-medium">Searching for opponent...</p>
+                  <p className="text-cc-muted text-xs">{rankedBucket.replace('_', ' ')} &middot; {queueElapsed}s elapsed</p>
+                </div>
+                <button onClick={leaveRankedQueue} className="btn-secondary text-sm py-1.5 px-4">Cancel</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  { bucket: 'blitz_120',    label: 'Blitz',    desc: '2 min per turn', icon: Zap },
+                  { bucket: 'standard_300', label: 'Standard', desc: '5 min per turn', icon: Clock },
+                  { bucket: 'long_1200',    label: 'Long',     desc: '20 min per turn', icon: Timer },
+                ] as const).map(({ bucket, label, desc, icon: Icon }) => (
+                  <button
+                    key={bucket}
+                    onClick={() => joinRankedQueue(bucket)}
+                    className="p-4 rounded-lg bg-cc-dark border border-cc-border hover:border-cc-gold
+                               transition-colors text-left group"
+                  >
+                    <Icon className="w-5 h-5 text-cc-gold mb-2" />
+                    <p className="font-display text-cc-gold group-hover:text-white transition-colors">{label}</p>
+                    <p className="text-cc-muted text-xs mt-1">{desc}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Create Game Form */}
-        {showCreate && (
+        {lobbyTab === 'casual' && showCreate && (
           <div className="card mb-8 animate-fade-in">
             <h3 className="font-display text-xl text-cc-gold mb-6">Configure New Game</h3>
             <form onSubmit={handleCreateGame} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -279,7 +458,7 @@ export default function LobbyPage() {
         )}
 
         {/* Active Games */}
-        {activeGames.length > 0 && (
+        {lobbyTab === 'casual' && activeGames.length > 0 && (
           <div className="card mb-8 animate-fade-in">
             <h3 className="font-display text-xl text-cc-gold mb-6 flex items-center gap-2">
               <Play className="w-5 h-5" /> Your Active Games
@@ -346,7 +525,7 @@ export default function LobbyPage() {
         )}
 
         {/* Public Games */}
-        <div className="card">
+        {lobbyTab === 'casual' && <div className="card">
           <h3 className="font-display text-xl text-cc-gold mb-6 flex items-center gap-2">
             <Globe className="w-5 h-5" /> Open Games
           </h3>
@@ -357,7 +536,7 @@ export default function LobbyPage() {
               {publicGames.map((game) => (
                 <div key={game.game_id} className="flex items-center justify-between p-4 bg-cc-dark rounded-lg border border-cc-border hover:border-cc-gold transition-colors">
                   <div>
-                    <span className="font-medium text-cc-text capitalize">{game.era_id.replace('ww2', 'World War II').replace('coldwar', 'Cold War').replace('modern', 'Modern Day')}</span>
+                    <span className="font-medium text-cc-text">{ERA_LABELS[game.era_id] ?? game.era_id}</span>
                     <span className="text-cc-muted text-sm ml-3">{game.player_count} / 8 players</span>
                   </div>
                   <button onClick={() => handleJoinGame(game.game_id)} className="btn-primary text-sm py-1.5 px-4">
@@ -367,8 +546,22 @@ export default function LobbyPage() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
+
+      <footer className="border-t border-cc-border mt-12 py-8 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <p className="font-display text-cc-gold/90 text-sm tracking-wide">Dashboard</p>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-cc-muted justify-center sm:justify-end" aria-label="Site">
+            <Link to="/lobby" className="hover:text-cc-gold transition-colors">Lobby</Link>
+            <Link to="/maps" className="hover:text-cc-gold transition-colors">Map Hub</Link>
+            <Link to="/editor" className="hover:text-cc-gold transition-colors">Map Editor</Link>
+            <Link to="/profile" className="hover:text-cc-gold transition-colors">Profile</Link>
+            <Link to="/privacy" className="hover:text-cc-gold transition-colors">Privacy Policy</Link>
+            <Link to="/" className="hover:text-cc-gold transition-colors">Marketing Home</Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -1,0 +1,547 @@
+{
+  "map_id": "era_risorgimento",
+  "name": "Italian Unification (1859–1871)",
+  "description": "Risorgimento Italy: from Piedmont and the Two Sicilies to a united kingdom. Territories follow modern provincial outlines grouped into historical regions.",
+  "era_theme": "risorgimento",
+  "canvas_width": 1200,
+  "canvas_height": 700,
+  "globe_view": {
+    "lock_rotation": true,
+    "center_lat": 42.5,
+    "center_lng": 12.5,
+    "altitude": 0.95
+  },
+  "territories": [
+    {
+      "territory_id": "ris_piemonte_liguria",
+      "name": "Piedmont & Liguria",
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          171,
+          0
+        ],
+        [
+          171,
+          350
+        ],
+        [
+          0,
+          350
+        ]
+      ],
+      "center_point": [
+        85.5,
+        175
+      ],
+      "region_id": "italy_northwest"
+    },
+    {
+      "territory_id": "ris_sardegna",
+      "name": "Sardinia",
+      "polygon": [
+        [
+          171,
+          0
+        ],
+        [
+          343,
+          0
+        ],
+        [
+          343,
+          350
+        ],
+        [
+          171,
+          350
+        ]
+      ],
+      "center_point": [
+        257,
+        175
+      ],
+      "region_id": "italy_islands"
+    },
+    {
+      "territory_id": "ris_lombardia",
+      "name": "Lombardy",
+      "polygon": [
+        [
+          343,
+          0
+        ],
+        [
+          514,
+          0
+        ],
+        [
+          514,
+          350
+        ],
+        [
+          343,
+          350
+        ]
+      ],
+      "center_point": [
+        428.5,
+        175
+      ],
+      "region_id": "italy_northwest"
+    },
+    {
+      "territory_id": "ris_veneto_friuli",
+      "name": "Veneto & Friuli",
+      "polygon": [
+        [
+          514,
+          0
+        ],
+        [
+          686,
+          0
+        ],
+        [
+          686,
+          350
+        ],
+        [
+          514,
+          350
+        ]
+      ],
+      "center_point": [
+        600,
+        175
+      ],
+      "region_id": "italy_adriatic"
+    },
+    {
+      "territory_id": "ris_trentino",
+      "name": "Trentino–South Tyrol",
+      "polygon": [
+        [
+          686,
+          0
+        ],
+        [
+          857,
+          0
+        ],
+        [
+          857,
+          350
+        ],
+        [
+          686,
+          350
+        ]
+      ],
+      "center_point": [
+        771.5,
+        175
+      ],
+      "region_id": "italy_northwest"
+    },
+    {
+      "territory_id": "ris_emilia",
+      "name": "Emilia-Romagna & San Marino",
+      "polygon": [
+        [
+          857,
+          0
+        ],
+        [
+          1029,
+          0
+        ],
+        [
+          1029,
+          350
+        ],
+        [
+          857,
+          350
+        ]
+      ],
+      "center_point": [
+        943,
+        175
+      ],
+      "region_id": "italy_adriatic"
+    },
+    {
+      "territory_id": "ris_toscana",
+      "name": "Tuscany",
+      "polygon": [
+        [
+          1029,
+          0
+        ],
+        [
+          1200,
+          0
+        ],
+        [
+          1200,
+          350
+        ],
+        [
+          1029,
+          350
+        ]
+      ],
+      "center_point": [
+        1114.5,
+        175
+      ],
+      "region_id": "italy_central"
+    },
+    {
+      "territory_id": "ris_marche_umbria",
+      "name": "Marche & Umbria",
+      "polygon": [
+        [
+          0,
+          350
+        ],
+        [
+          171,
+          350
+        ],
+        [
+          171,
+          700
+        ],
+        [
+          0,
+          700
+        ]
+      ],
+      "center_point": [
+        85.5,
+        525
+      ],
+      "region_id": "italy_central"
+    },
+    {
+      "territory_id": "ris_lazio",
+      "name": "Lazio & Rome",
+      "polygon": [
+        [
+          171,
+          350
+        ],
+        [
+          343,
+          350
+        ],
+        [
+          343,
+          700
+        ],
+        [
+          171,
+          700
+        ]
+      ],
+      "center_point": [
+        257,
+        525
+      ],
+      "region_id": "italy_central"
+    },
+    {
+      "territory_id": "ris_abruzzo_molise",
+      "name": "Abruzzo & Molise",
+      "polygon": [
+        [
+          343,
+          350
+        ],
+        [
+          514,
+          350
+        ],
+        [
+          514,
+          700
+        ],
+        [
+          343,
+          700
+        ]
+      ],
+      "center_point": [
+        428.5,
+        525
+      ],
+      "region_id": "italy_south"
+    },
+    {
+      "territory_id": "ris_campania",
+      "name": "Campania",
+      "polygon": [
+        [
+          514,
+          350
+        ],
+        [
+          686,
+          350
+        ],
+        [
+          686,
+          700
+        ],
+        [
+          514,
+          700
+        ]
+      ],
+      "center_point": [
+        600,
+        525
+      ],
+      "region_id": "italy_south"
+    },
+    {
+      "territory_id": "ris_puglia",
+      "name": "Apulia",
+      "polygon": [
+        [
+          686,
+          350
+        ],
+        [
+          857,
+          350
+        ],
+        [
+          857,
+          700
+        ],
+        [
+          686,
+          700
+        ]
+      ],
+      "center_point": [
+        771.5,
+        525
+      ],
+      "region_id": "italy_south"
+    },
+    {
+      "territory_id": "ris_sud",
+      "name": "Calabria & Basilicata",
+      "polygon": [
+        [
+          857,
+          350
+        ],
+        [
+          1029,
+          350
+        ],
+        [
+          1029,
+          700
+        ],
+        [
+          857,
+          700
+        ]
+      ],
+      "center_point": [
+        943,
+        525
+      ],
+      "region_id": "italy_deep_south"
+    },
+    {
+      "territory_id": "ris_sicilia",
+      "name": "Sicily",
+      "polygon": [
+        [
+          1029,
+          350
+        ],
+        [
+          1200,
+          350
+        ],
+        [
+          1200,
+          700
+        ],
+        [
+          1029,
+          700
+        ]
+      ],
+      "center_point": [
+        1114.5,
+        525
+      ],
+      "region_id": "italy_deep_south"
+    }
+  ],
+  "connections": [
+    {
+      "from": "ris_abruzzo_molise",
+      "to": "ris_campania",
+      "type": "land"
+    },
+    {
+      "from": "ris_abruzzo_molise",
+      "to": "ris_lazio",
+      "type": "land"
+    },
+    {
+      "from": "ris_abruzzo_molise",
+      "to": "ris_marche_umbria",
+      "type": "land"
+    },
+    {
+      "from": "ris_abruzzo_molise",
+      "to": "ris_puglia",
+      "type": "land"
+    },
+    {
+      "from": "ris_campania",
+      "to": "ris_lazio",
+      "type": "land"
+    },
+    {
+      "from": "ris_campania",
+      "to": "ris_puglia",
+      "type": "land"
+    },
+    {
+      "from": "ris_campania",
+      "to": "ris_sud",
+      "type": "land"
+    },
+    {
+      "from": "ris_emilia",
+      "to": "ris_lombardia",
+      "type": "land"
+    },
+    {
+      "from": "ris_emilia",
+      "to": "ris_marche_umbria",
+      "type": "land"
+    },
+    {
+      "from": "ris_emilia",
+      "to": "ris_piemonte_liguria",
+      "type": "land"
+    },
+    {
+      "from": "ris_emilia",
+      "to": "ris_toscana",
+      "type": "land"
+    },
+    {
+      "from": "ris_emilia",
+      "to": "ris_veneto_friuli",
+      "type": "land"
+    },
+    {
+      "from": "ris_lazio",
+      "to": "ris_marche_umbria",
+      "type": "land"
+    },
+    {
+      "from": "ris_lazio",
+      "to": "ris_toscana",
+      "type": "land"
+    },
+    {
+      "from": "ris_lombardia",
+      "to": "ris_piemonte_liguria",
+      "type": "land"
+    },
+    {
+      "from": "ris_lombardia",
+      "to": "ris_trentino",
+      "type": "land"
+    },
+    {
+      "from": "ris_lombardia",
+      "to": "ris_veneto_friuli",
+      "type": "land"
+    },
+    {
+      "from": "ris_marche_umbria",
+      "to": "ris_toscana",
+      "type": "land"
+    },
+    {
+      "from": "ris_piemonte_liguria",
+      "to": "ris_sardegna",
+      "type": "sea"
+    },
+    {
+      "from": "ris_piemonte_liguria",
+      "to": "ris_toscana",
+      "type": "land"
+    },
+    {
+      "from": "ris_puglia",
+      "to": "ris_sud",
+      "type": "land"
+    },
+    {
+      "from": "ris_sud",
+      "to": "ris_sicilia",
+      "type": "sea"
+    },
+    {
+      "from": "ris_trentino",
+      "to": "ris_veneto_friuli",
+      "type": "land"
+    }
+  ],
+  "regions": [
+    {
+      "region_id": "italy_northwest",
+      "name": "Northern Italy",
+      "bonus": 4
+    },
+    {
+      "region_id": "italy_adriatic",
+      "name": "Adriatic & Romagna",
+      "bonus": 4
+    },
+    {
+      "region_id": "italy_central",
+      "name": "Central Italy",
+      "bonus": 4
+    },
+    {
+      "region_id": "italy_south",
+      "name": "Southern Mainland",
+      "bonus": 3
+    },
+    {
+      "region_id": "italy_deep_south",
+      "name": "Deep South",
+      "bonus": 3
+    },
+    {
+      "region_id": "italy_islands",
+      "name": "Sardinia",
+      "bonus": 2
+    }
+  ],
+  "is_public": true,
+  "is_moderated": true,
+  "moderation_status": "approved",
+  "creator_id": "system"
+}

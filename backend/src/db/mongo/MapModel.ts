@@ -33,6 +33,13 @@ export interface IRegion {
   bonus: number;
 }
 
+export interface IGlobeView {
+  lock_rotation?: boolean;
+  center_lat?: number;
+  center_lng?: number;
+  altitude?: number;
+}
+
 export interface ICustomMap extends Document {
   map_id: string;
   creator_id: string;
@@ -42,6 +49,7 @@ export interface ICustomMap extends Document {
   background_image_url?: string;
   canvas_width?: number;
   canvas_height?: number;
+  globe_view?: IGlobeView;
   territories: ITerritory[];
   connections: IConnection[];
   regions: IRegion[];
@@ -92,6 +100,18 @@ const CustomMapSchema = new Schema<ICustomMap>(
     background_image_url: { type: String },
     canvas_width: { type: Number, default: 1200 },
     canvas_height: { type: Number, default: 700 },
+    globe_view: {
+      type: new Schema(
+        {
+          lock_rotation: { type: Boolean },
+          center_lat: { type: Number },
+          center_lng: { type: Number },
+          altitude: { type: Number },
+        },
+        { _id: false },
+      ),
+      required: false,
+    },
     territories: { type: [TerritorySchema], required: true },
     connections: { type: [ConnectionSchema], required: true },
     regions: { type: [RegionSchema], required: true },

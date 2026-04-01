@@ -31,9 +31,16 @@ export interface GameMap {
   map_id: string;
   name: string;
   description: string;
-  era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'custom';
+  era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
   canvas_width: number;
   canvas_height: number;
+  /** Globe: lock idle rotation and frame camera for regional / theater maps */
+  globe_view?: {
+    lock_rotation?: boolean;
+    center_lat?: number;
+    center_lng?: number;
+    altitude?: number;
+  };
   territories: Territory[];
   connections: Connection[];
   regions: Region[];
@@ -105,6 +112,20 @@ export const ERA_METADATA: Record<string, {
     color: '#2ECC71',
     bgColor: '#0B1A0F',
     description: 'Command modern superpowers, build alliances, and dominate the 21st-century geopolitical landscape.',
+  },
+  acw: {
+    label: 'American Civil War',
+    year: '1861–1865',
+    color: '#6B5344',
+    bgColor: '#1A1510',
+    description: 'Union versus Confederacy: fight for the Eastern Theater, the Mississippi, and the Trans-Mississippi West.',
+  },
+  risorgimento: {
+    label: 'Italian Unification',
+    year: '1859–1871',
+    color: '#008C45',
+    bgColor: '#0f1a14',
+    description: 'Risorgimento Italy: Piedmont, the Two Sicilies, Papal States, and Austrian Italy on a peninsula-scale map.',
   },
 };
 

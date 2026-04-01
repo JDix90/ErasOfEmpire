@@ -4,7 +4,9 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
 import toast from 'react-hot-toast';
-import { Trophy, Sword, Map, Flame, Target, Users, Bot, Zap } from 'lucide-react';
+import { Trophy, Sword, Map, Flame, Target, Users, Bot, Zap, Shield, Award, GraduationCap } from 'lucide-react';
+
+interface RatingInfo { mu: number; phi: number; display: number; provisional: boolean }
 
 interface UserProfile {
   user_id: string;
@@ -14,7 +16,25 @@ interface UserProfile {
   mmr: number;
   avatar_url?: string;
   created_at: string;
+  ratings?: { solo?: RatingInfo; ranked?: RatingInfo };
+  equipped_frame?: string | null;
 }
+
+interface Achievement {
+  achievement_id: string;
+  name: string;
+  description: string;
+  xp_reward: number;
+  icon_url?: string;
+  unlocked_at?: string;
+}
+
+const FRAME_GRADIENTS: Record<string, string> = {
+  frame_bronze: 'from-amber-700 via-amber-500 to-amber-700',
+  frame_silver: 'from-gray-400 via-white to-gray-400',
+  frame_gold: 'from-yellow-500 via-yellow-300 to-yellow-500',
+  frame_champion: 'from-purple-500 via-pink-400 to-purple-500',
+};
 
 interface GameHistory {
   game_id: string;
@@ -68,24 +88,48 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'solo' | 'multi' | 'hybrid'>('solo');
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [tutorialLaunching, setTutorialLaunching] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const targetId = userId ?? currentUser?.user_id;
   const isOwnProfile = !userId || userId === currentUser?.user_id;
 
   useEffect(() => {
     if (!targetId) return;
+    setLoadError(null);
     Promise.all([
       isOwnProfile ? api.get('/users/me') : api.get(`/users/${targetId}`),
       isOwnProfile ? api.get('/users/me/games') : Promise.resolve({ data: [] }),
       isOwnProfile ? api.get('/users/me/stats') : Promise.resolve({ data: null }),
-    ]).then(([profileRes, gamesRes, statsRes]) => {
+      isOwnProfile ? api.get('/users/me/achievements') : Promise.resolve({ data: [] }),
+      api.get('/users/achievements').catch(() => ({ data: [] })),
+    ]).then(([profileRes, gamesRes, statsRes, achRes, allAchRes]) => {
       setProfile(profileRes.data);
       setGames(gamesRes.data);
       if (statsRes.data) setStats(statsRes.data);
+      setAchievements(achRes.data);
+      setAllAchievements(allAchRes.data);
+    }).catch((err: unknown) => {
+      const msg = axios.isAxiosError(err) ? (err.response?.data as { error?: string })?.error ?? err.message : 'Failed to load profile';
+      setLoadError(msg);
+      toast.error(typeof msg === 'string' ? msg : 'Failed to load profile');
     }).finally(() => setLoading(false));
   }, [targetId, isOwnProfile]);
+
+  const handleStartTutorial = async () => {
+    setTutorialLaunching(true);
+    try {
+      const res = await api.post<{ game_id: string }>('/games/tutorial/start', { era: 'ww2' });
+      navigate(`/game/${res.data.game_id}`);
+    } catch {
+      toast.error('Failed to start tutorial');
+      setTutorialLaunching(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -97,8 +141,14 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-cc-dark flex items-center justify-center">
-        <p className="text-cc-muted">User not found.</p>
+      <div className="min-h-screen bg-cc-dark flex flex-col items-center justify-center gap-4 px-4">
+        <p className="text-cc-muted text-center">{loadError ?? 'User not found.'}</p>
+        {loadError && (
+          <p className="text-cc-muted/70 text-sm text-center max-w-md">
+            If the server was updated recently, apply pending database migrations so ratings and profile columns exist.
+          </p>
+        )}
+        <Link to="/lobby" className="btn-secondary text-sm">Back to Lobby</Link>
       </div>
     );
   }
@@ -122,18 +172,34 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         {/* Profile Card */}
         <div className="card flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full bg-cc-border flex items-center justify-center text-3xl shrink-0">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={profile.username} className="w-full h-full rounded-full object-cover" />
-            ) : (
-              profile.username[0].toUpperCase()
-            )}
+          <div className={`p-1 rounded-full shrink-0 ${
+            profile.equipped_frame && FRAME_GRADIENTS[profile.equipped_frame]
+              ? `bg-gradient-to-r ${FRAME_GRADIENTS[profile.equipped_frame]}`
+              : ''
+          }`}>
+            <div className="w-20 h-20 rounded-full bg-cc-border flex items-center justify-center text-3xl">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile.username} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                profile.username[0].toUpperCase()
+              )}
+            </div>
           </div>
           <div className="flex-1">
             <h2 className="font-display text-2xl text-cc-gold">{profile.username}</h2>
             <p className="text-cc-muted text-sm mt-1">
-              Level {profile.level} · MMR {profile.mmr} · Member since {new Date(profile.created_at).getFullYear()}
+              Level {profile.level} · Member since {new Date(profile.created_at).getFullYear()}
             </p>
+            <div className="flex items-center gap-4 mt-1">
+              <span className="text-cc-muted text-xs flex items-center gap-1">
+                <Bot className="w-3 h-3" /> Solo {profile.ratings?.solo?.display ?? '—'}
+                {profile.ratings?.solo?.provisional && <span className="text-cc-gold/60">(P)</span>}
+              </span>
+              <span className="text-cc-muted text-xs flex items-center gap-1">
+                <Shield className="w-3 h-3" /> Ranked {profile.ratings?.ranked?.display ?? '—'}
+                {profile.ratings?.ranked?.provisional && <span className="text-cc-gold/60">(P)</span>}
+              </span>
+            </div>
             <div className="mt-3">
               <div className="flex justify-between text-xs text-cc-muted mb-1">
                 <span>XP Progress</span>
@@ -148,6 +214,28 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {isOwnProfile && (
+          <div className="card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-cc-gold/20">
+            <div>
+              <h3 className="font-display text-lg text-cc-gold flex items-center gap-2">
+                <GraduationCap className="w-5 h-5" /> Interactive tutorial
+              </h3>
+              <p className="text-cc-muted text-sm mt-1 max-w-xl">
+                Start a new guided match on the World War II map with on-screen tips for draft, attack, and fortify. Replay anytime for a refresher.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartTutorial}
+              disabled={tutorialLaunching}
+              className="btn-primary flex items-center justify-center gap-2 shrink-0 py-2.5 px-5 disabled:opacity-60"
+            >
+              <GraduationCap className="w-4 h-4" />
+              {tutorialLaunching ? 'Starting…' : 'Launch tutorial'}
+            </button>
+          </div>
+        )}
 
         {/* Overall Stats Row */}
         {stats && (
@@ -238,6 +326,41 @@ export default function ProfilePage() {
                 Favorite era: <span className="text-cc-gold">{ERA_LABELS[stats.favorite_era] ?? stats.favorite_era}</span>
               </p>
             )}
+          </div>
+        )}
+
+        {/* Achievements */}
+        {isOwnProfile && allAchievements.length > 0 && (
+          <div className="card">
+            <h3 className="font-display text-lg text-cc-gold mb-4 flex items-center gap-2">
+              <Award className="w-5 h-5" /> Achievements
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {allAchievements.map((a) => {
+                const unlocked = achievements.find((u) => u.achievement_id === a.achievement_id);
+                return (
+                  <div
+                    key={a.achievement_id}
+                    className={`p-3 rounded-lg border ${
+                      unlocked
+                        ? 'bg-cc-gold/5 border-cc-gold/20'
+                        : 'bg-cc-dark border-cc-border opacity-50'
+                    }`}
+                  >
+                    <p className={`text-sm font-medium ${unlocked ? 'text-cc-gold' : 'text-cc-muted'}`}>
+                      {unlocked ? a.name : '???'}
+                    </p>
+                    <p className="text-xs text-cc-muted mt-1 leading-relaxed">{a.description}</p>
+                    {unlocked?.unlocked_at && (
+                      <p className="text-[10px] text-cc-muted/60 mt-1">
+                        {new Date(unlocked.unlocked_at).toLocaleDateString()}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-cc-gold/50 mt-1">+{a.xp_reward} XP</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

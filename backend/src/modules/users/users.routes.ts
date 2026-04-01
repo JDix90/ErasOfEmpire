@@ -9,18 +9,68 @@ const DeleteAccountSchema = z.object({
   password: z.string().min(1, 'Password is required to delete your account'),
 });
 
+type RatingRow = { rating_type: string; mu: number; phi: number };
+
+function buildRatingsMap(rows: RatingRow[]): Record<string, { mu: number; phi: number; display: number; provisional: boolean }> {
+  const ratings: Record<string, { mu: number; phi: number; display: number; provisional: boolean }> = {};
+  for (const r of rows) {
+    ratings[r.rating_type] = {
+      mu: r.mu,
+      phi: r.phi,
+      display: Math.round(r.mu),
+      provisional: r.phi > 150,
+    };
+  }
+  return ratings;
+}
+
+/** Works before migration 004 (no user_ratings table). */
+async function fetchUserRatingsSafe(userId: string): Promise<Record<string, { mu: number; phi: number; display: number; provisional: boolean }>> {
+  try {
+    const ratingRows = await query<RatingRow>(
+      'SELECT rating_type, mu, phi FROM user_ratings WHERE user_id = $1',
+      [userId],
+    );
+    return buildRatingsMap(ratingRows);
+  } catch {
+    return {};
+  }
+}
+
 export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
   // ── GET /api/users/me ────────────────────────────────────────────────────
   fastify.get('/me', { preHandler: authenticate }, async (request, reply) => {
-    const user = await queryOne<{
-      user_id: string; username: string; level: number; xp: number;
-      mmr: number; avatar_url: string | null; created_at: Date;
-    }>(
-      'SELECT user_id, username, level, xp, mmr, avatar_url, created_at FROM users WHERE user_id = $1',
-      [request.userId]
-    );
+    type UserRow = {
+      user_id: string;
+      username: string;
+      level: number;
+      xp: number;
+      mmr: number;
+      avatar_url: string | null;
+      created_at: Date;
+      equipped_frame?: string | null;
+      equipped_marker?: string | null;
+    };
+
+    let user: UserRow | null = null;
+    try {
+      user = await queryOne<UserRow>(
+        `SELECT user_id, username, level, xp, mmr, avatar_url, created_at,
+                equipped_frame, equipped_marker
+         FROM users WHERE user_id = $1`,
+        [request.userId],
+      );
+    } catch {
+      user = await queryOne<UserRow>(
+        `SELECT user_id, username, level, xp, mmr, avatar_url, created_at
+         FROM users WHERE user_id = $1`,
+        [request.userId],
+      );
+    }
     if (!user) return reply.status(404).send({ error: 'User not found' });
-    return reply.send(user);
+
+    const ratings = await fetchUserRatingsSafe(request.userId);
+    return reply.send({ ...user, ratings });
   });
 
   // ── DELETE /api/users/me (account deletion — run migration 003 first) ───
@@ -31,7 +81,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     }
     const row = await queryOne<{ password_hash: string }>(
       'SELECT password_hash FROM users WHERE user_id = $1',
-      [request.userId]
+      [request.userId],
     );
     if (!row) return reply.status(404).send({ error: 'User not found' });
     const ok = await bcrypt.compare(parsed.data.password, row.password_hash);
@@ -41,18 +91,6 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
 
     reply.clearCookie('refreshToken', { path: '/api/auth' });
     return reply.send({ message: 'Account deleted' });
-  });
-
-  // ── GET /api/users/:userId ───────────────────────────────────────────────
-  fastify.get<{ Params: { userId: string } }>('/:userId', async (request, reply) => {
-    const user = await queryOne<{
-      user_id: string; username: string; level: number; mmr: number; avatar_url: string | null;
-    }>(
-      'SELECT user_id, username, level, mmr, avatar_url FROM users WHERE user_id = $1',
-      [request.params.userId]
-    );
-    if (!user) return reply.status(404).send({ error: 'User not found' });
-    return reply.send(user);
   });
 
   // ── GET /api/users/me/active-games ──────────────────────────────────────
@@ -71,8 +109,9 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
          WHERE game_id = g.game_id ORDER BY turn_number DESC LIMIT 1
        ) gs ON true
        WHERE gp.user_id = $1 AND g.status = 'in_progress'
+         AND COALESCE(g.settings_json::jsonb->>'tutorial', 'false') <> 'true'
        ORDER BY COALESCE(gs.saved_at, g.started_at, g.created_at) DESC`,
-      [request.userId]
+      [request.userId],
     );
     return reply.send(games);
   });
@@ -89,7 +128,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
        JOIN games g ON g.game_id = gp.game_id
        WHERE gp.user_id = $1 AND g.status = 'completed'
        GROUP BY g.game_type, g.era_id, (gp.final_rank = 1)`,
-      [request.userId]
+      [request.userId],
     );
 
     type Bucket = { played: number; won: number; win_rate: number };
@@ -119,7 +158,6 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     const rate = (b: Bucket) => { b.win_rate = b.played > 0 ? +(b.won / b.played).toFixed(2) : 0; };
     rate(overall); rate(solo); rate(multi); rate(hybrid);
 
-    // Streak calculation
     const recentGames = await query<{ won: boolean; ended_at: Date }>(
       `SELECT (gp.final_rank = 1) AS won, g.ended_at
        FROM game_players gp
@@ -127,7 +165,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
        WHERE gp.user_id = $1 AND g.status = 'completed'
        ORDER BY g.ended_at DESC
        LIMIT 100`,
-      [request.userId]
+      [request.userId],
     );
     let currentWinStreak = 0;
     let bestWinStreak = 0;
@@ -150,6 +188,8 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
       if (data.played > maxPlayed) { maxPlayed = data.played; favoriteEra = era; }
     }
 
+    const ratings = await fetchUserRatingsSafe(request.userId);
+
     return reply.send({
       overall,
       solo,
@@ -158,6 +198,7 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
       by_era: byEra,
       streaks: { current_win: currentWinStreak, best_win: bestWinStreak },
       favorite_era: favoriteEra,
+      ratings,
     });
   });
 
@@ -169,48 +210,132 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
        JOIN achievements a ON a.achievement_id = ua.achievement_id
        WHERE ua.user_id = $1
        ORDER BY ua.unlocked_at DESC`,
-      [request.userId]
+      [request.userId],
     );
     return reply.send(achievements);
   });
 
   // ── GET /api/users/me/games ──────────────────────────────────────────────
   fastify.get('/me/games', { preHandler: authenticate }, async (request, reply) => {
-    const games = await query(
-      `SELECT g.game_id, g.era_id, g.status, g.created_at, g.ended_at,
-              gp.player_color, gp.final_rank, gp.xp_earned, gp.mmr_change
-       FROM game_players gp
-       JOIN games g ON g.game_id = gp.game_id
-       WHERE gp.user_id = $1
-       ORDER BY g.created_at DESC
-       LIMIT 20`,
-      [request.userId]
+    try {
+      const games = await query(
+        `SELECT g.game_id, g.era_id, g.status, g.created_at, g.ended_at,
+                g.is_ranked, gp.player_color, gp.final_rank, gp.xp_earned, gp.mmr_change
+         FROM game_players gp
+         JOIN games g ON g.game_id = gp.game_id
+         WHERE gp.user_id = $1
+           AND COALESCE(g.settings_json::jsonb->>'tutorial', 'false') <> 'true'
+         ORDER BY g.created_at DESC
+         LIMIT 20`,
+        [request.userId],
+      );
+      return reply.send(games);
+    } catch {
+      const games = await query(
+        `SELECT g.game_id, g.era_id, g.status, g.created_at, g.ended_at,
+                gp.player_color, gp.final_rank, gp.xp_earned, gp.mmr_change
+         FROM game_players gp
+         JOIN games g ON g.game_id = gp.game_id
+         WHERE gp.user_id = $1
+           AND COALESCE(g.settings_json::jsonb->>'tutorial', 'false') <> 'true'
+         ORDER BY g.created_at DESC
+         LIMIT 20`,
+        [request.userId],
+      );
+      return reply.send(games);
+    }
+  });
+
+  // ── GET /api/users/achievements (all definitions) — before /:userId ─────
+  fastify.get('/achievements', async (_request, reply) => {
+    const rows = await query(
+      'SELECT achievement_id, name, description, xp_reward, icon_url FROM achievements ORDER BY name',
     );
-    return reply.send(games);
+    return reply.send(rows);
+  });
+
+  // ── GET /api/users/me/cosmetics ──────────────────────────────────────────
+  fastify.get('/me/cosmetics', { preHandler: authenticate }, async (request, reply) => {
+    try {
+      const owned = await query(
+        `SELECT c.cosmetic_id, c.type, c.name, c.description, c.asset_url,
+                (c.cosmetic_id = u.equipped_frame) AS is_equipped_frame,
+                (c.cosmetic_id = u.equipped_marker) AS is_equipped_marker
+         FROM user_cosmetics uc
+         JOIN cosmetics c ON c.cosmetic_id = uc.cosmetic_id
+         CROSS JOIN users u
+         WHERE u.user_id = $1 AND uc.user_id = $1`,
+        [request.userId],
+      );
+      return reply.send(owned);
+    } catch {
+      const owned = await query(
+        `SELECT c.cosmetic_id, c.type, c.name, c.description, c.asset_url,
+                FALSE AS is_equipped_frame, FALSE AS is_equipped_marker
+         FROM user_cosmetics uc
+         JOIN cosmetics c ON c.cosmetic_id = uc.cosmetic_id
+         WHERE uc.user_id = $1`,
+        [request.userId],
+      );
+      return reply.send(owned);
+    }
+  });
+
+  // ── PUT /api/users/me/cosmetics/equip ────────────────────────────────────
+  fastify.put('/me/cosmetics/equip', { preHandler: authenticate }, async (request, reply) => {
+    const body = request.body as { frame_id?: string; marker_id?: string } | undefined;
+    if (!body) return reply.status(400).send({ error: 'Missing body' });
+
+    if (body.frame_id) {
+      const owns = await queryOne(
+        `SELECT 1 FROM user_cosmetics uc JOIN cosmetics c ON c.cosmetic_id = uc.cosmetic_id
+         WHERE uc.user_id = $1 AND uc.cosmetic_id = $2 AND c.type IN ('profile_frame', 'profile_banner')`,
+        [request.userId, body.frame_id],
+      );
+      if (!owns) return reply.status(403).send({ error: 'Cosmetic not owned or wrong type' });
+    }
+    if (body.marker_id) {
+      const owns = await queryOne(
+        `SELECT 1 FROM user_cosmetics uc JOIN cosmetics c ON c.cosmetic_id = uc.cosmetic_id
+         WHERE uc.user_id = $1 AND uc.cosmetic_id = $2 AND c.type = 'map_marker'`,
+        [request.userId, body.marker_id],
+      );
+      if (!owns) return reply.status(403).send({ error: 'Cosmetic not owned or wrong type' });
+    }
+
+    try {
+      await query(
+        `UPDATE users SET equipped_frame = COALESCE($1, equipped_frame),
+                          equipped_marker = COALESCE($2, equipped_marker)
+         WHERE user_id = $3`,
+        [body.frame_id ?? null, body.marker_id ?? null, request.userId],
+      );
+    } catch {
+      return reply.status(503).send({ error: 'Cosmetic equip requires database migration (equipped_frame columns).' });
+    }
+    return reply.send({ ok: true });
   });
 
   // ── GET /api/users/leaderboard/:era ─────────────────────────────────────
   fastify.get<{ Params: { era: string } }>('/leaderboard/:era', async (request, reply) => {
     const { era } = request.params;
-    const validEras = ['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'global'];
+        const validEras = ['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'acw', 'risorgimento', 'global'];
     if (!validEras.includes(era)) {
       return reply.status(400).send({ error: 'Invalid era' });
     }
 
     const leaderboard = await getLeaderboard(era, 100);
     if (leaderboard.length === 0) {
-      // Fallback to PostgreSQL if Redis is empty
       const rows = await query<{ user_id: string; username: string; mmr: number; level: number }>(
-        'SELECT user_id, username, mmr, level FROM users ORDER BY mmr DESC LIMIT 100'
+        'SELECT user_id, username, mmr, level FROM users ORDER BY mmr DESC LIMIT 100',
       );
       return reply.send(rows);
     }
 
-    // Enrich with usernames
     const userIds = leaderboard.map((e) => e.userId);
     const users = await query<{ user_id: string; username: string; level: number }>(
       `SELECT user_id, username, level FROM users WHERE user_id = ANY($1)`,
-      [userIds]
+      [userIds],
     );
     const userMap = Object.fromEntries(users.map((u) => [u.user_id, u]));
     const enriched = leaderboard.map((e, i) => ({
@@ -232,8 +357,20 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
        )
        WHERE (f.user_id_a = $1 OR f.user_id_b = $1)
          AND f.status = 'accepted'`,
-      [request.userId]
+      [request.userId],
     );
     return reply.send(friends);
+  });
+
+  // ── GET /api/users/:userId (public profile) — must be after /achievements etc ─
+  fastify.get<{ Params: { userId: string } }>('/:userId', async (request, reply) => {
+    const user = await queryOne<{
+      user_id: string; username: string; level: number; mmr: number; avatar_url: string | null;
+    }>(
+      'SELECT user_id, username, level, mmr, avatar_url FROM users WHERE user_id = $1',
+      [request.params.userId],
+    );
+    if (!user) return reply.status(404).send({ error: 'User not found' });
+    return reply.send(user);
   });
 }

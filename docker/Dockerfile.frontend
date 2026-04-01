@@ -1,0 +1,18 @@
+# Same-origin SPA: nginx proxies /api and /socket.io to the backend (no VITE_* required).
+# Build from repository root: docker build -f docker/Dockerfile.frontend .
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/package.json ./frontend/
+COPY backend/package.json ./backend/
+RUN corepack enable pnpm && pnpm install --frozen-lockfile
+COPY frontend ./frontend
+WORKDIR /app/frontend
+ARG VITE_API_URL=
+ARG VITE_SOCKET_URL=
+ENV VITE_API_URL=$VITE_API_URL VITE_SOCKET_URL=$VITE_SOCKET_URL
+RUN pnpm run build
+
+FROM nginx:alpine
+COPY docker/nginx.prod.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html

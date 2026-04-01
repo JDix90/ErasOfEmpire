@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { sanitizePostAuthRedirect } from '../utils/navRedirect';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = sanitizePostAuthRedirect(searchParams.get('redirect'));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await login(email, password);
       toast.success('Welcome back, Commander!');
-      navigate('/lobby');
+      navigate(redirectTo);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         toast.error(err.response?.data?.error || 'Login failed');
@@ -66,7 +69,12 @@ export default function LoginPage() {
 
           <p className="text-center text-cc-muted text-sm mt-6">
             No account?{' '}
-            <Link to="/register" className="text-cc-gold hover:underline">Create one free</Link>
+            <Link
+              to={redirectTo !== '/lobby' ? `/register?redirect=${encodeURIComponent(redirectTo)}` : '/register'}
+              className="text-cc-gold hover:underline"
+            >
+              Create one free
+            </Link>
           </p>
         </div>
       </div>

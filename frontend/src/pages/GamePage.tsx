@@ -9,6 +9,8 @@ import GlobeMap, { type GlobeEvent } from '../components/game/GlobeMap';
 import GameHUD from '../components/game/GameHUD';
 import TerritoryPanel from '../components/game/TerritoryPanel';
 import ActionModal, { ActionNotification, ModalData, NotificationData, ReinforcementEntry, FortifyEntry, GameOverModalData, EliminationModalData } from '../components/game/ActionModal';
+import TutorialOverlay, { TUTORIAL_STEPS } from '../components/game/TutorialOverlay';
+import { computeDraftPool } from '../utils/draftPool';
 import toast from 'react-hot-toast';
 import {
   getInitialMapView,
@@ -22,6 +24,12 @@ interface MapData {
   name: string;
   canvas_width?: number;
   canvas_height?: number;
+  globe_view?: {
+    lock_rotation?: boolean;
+    center_lat?: number;
+    center_lng?: number;
+    altitude?: number;
+  };
   territories: Array<{
     territory_id: string;
     name: string;
@@ -49,6 +57,8 @@ export default function GamePage() {
   const [isHost, setIsHost] = useState(false);
   const [mapView, setMapView] = useState<'2d' | 'globe'>(getInitialMapView);
   const mapDataRef = useRef<MapData | null>(null);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const isTutorial = gameState?.settings?.tutorial === true;
 
   // Keep a ref to the current user so socket handlers never close over a stale value
   const userRef = useRef(user);
@@ -75,6 +85,18 @@ export default function GamePage() {
   const ownTurnCombatsRef = useRef<CombatResult[]>([]);
   const ownTurnReinforcementsRef = useRef<ReinforcementEntry[]>([]);
   const ownTurnFortificationsRef = useRef<FortifyEntry[]>([]);
+  /** Prevent duplicate socket emits while waiting for game:state after auto phase advance */
+  const tutorialDraftToAttackPendingRef = useRef(false);
+  const tutorialAttackToFortifyPendingRef = useRef(false);
+  /** attack_do: only auto-emit attack→fortify once */
+  const tutorialAttackPhaseAutoEmittedRef = useRef(false);
+  /** fortify_explain: auto end turn once */
+  const tutorialFortifyEndEmittedRef = useRef(false);
+  const tutorialFortifyScheduleStartedRef = useRef(false);
+  const tutorialStepRef = useRef(tutorialStep);
+  tutorialStepRef.current = tutorialStep;
+  /** Increments when player completes an attack during attack_do — triggers auto phase advance */
+  const [tutorialAttackAutoTick, setTutorialAttackAutoTick] = useState(0);
 
   const pushModal = useCallback((data: ModalData) => {
     setModalQueue(prev => [...prev, data]);
@@ -107,16 +129,8 @@ export default function GamePage() {
       setGameStarted(true);
       setGameState(state);
       const myId = userRef.current?.user_id;
-
-      // Read authoritative draft count from server; fallback to local calc for older saves
-      let draftCount = state.draft_units_remaining;
-      if ((draftCount === undefined || draftCount === null) && state.phase === 'draft') {
-        const me = state.players.find((p: { player_id: string }) => p.player_id === myId);
-        if (me && state.players[state.current_player_index]?.player_id === myId) {
-          draftCount = Math.max(3, Math.floor(me.territory_count / 3));
-        }
-      }
-      setDraftUnitsRemaining(draftCount ?? 0);
+      const prevDraft = useGameStore.getState().draftUnitsRemaining;
+      setDraftUnitsRemaining(computeDraftPool(state, myId, prevDraft));
 
       // ── Turn change detection ────────────────────────────────────────
       const newIndex = state.current_player_index;
@@ -184,6 +198,45 @@ export default function GamePage() {
 
       prevPlayerIndexRef.current = newIndex;
       prevPhaseRef.current = state.phase;
+
+      // Auto-advance tutorial steps on phase changes and draft completion
+      if (state.settings?.tutorial) {
+        const myId = userRef.current?.user_id;
+        const isMyDraftTurn =
+          state.phase === 'draft' &&
+          !!myId &&
+          state.players[state.current_player_index]?.player_id === myId;
+        const draftLeft = isMyDraftTurn
+          ? computeDraftPool(state, myId, state.draft_units_remaining ?? 0)
+          : -1;
+
+        setTutorialStep((cur) => {
+          const step = TUTORIAL_STEPS[cur];
+          if (!step) return cur;
+          // Opponent finished → your turn again (watch AI / other players)
+          if (
+            step.requireAction === 'my_turn' &&
+            playerChanged &&
+            prevIndex !== null &&
+            myId
+          ) {
+            const prevPid = state.players[prevIndex]?.player_id;
+            const nowPid = state.players[newIndex]?.player_id;
+            if (prevPid !== myId && nowPid === myId) {
+              return cur + 1;
+            }
+          }
+          // Advance after last reinforcement is placed (still in draft) or when attack phase begins
+          if (
+            step.requireAction === 'draft' &&
+            (state.phase === 'attack' || (isMyDraftTurn && draftLeft === 0))
+          ) {
+            return cur + 1;
+          }
+          if (step.requireAction === 'end_phase' && prevPhase && prevPhase !== state.phase) return cur + 1;
+          return cur;
+        });
+      }
     });
 
     socket.on('game:started', () => {
@@ -218,9 +271,31 @@ export default function GamePage() {
       const isMyAttack = attackerOwner === userRef.current?.user_id;
       const isMyDefense = defenderOwner === userRef.current?.user_id;
 
+      const { attacker_losses, defender_losses, territory_captured } = data.result;
+      const preFromUnits = state?.territories[data.fromId]?.unit_count ?? 0;
+      const unitsAfterOnSource = preFromUnits - attacker_losses;
+      const canRepeatAttack =
+        isMyAttack &&
+        !territory_captured &&
+        unitsAfterOnSource >= 2;
+
       if (isMyAttack) {
-        setModalQueue(q => [...q, { type: 'combat' as const, result: enriched, perspective: 'attacker' as const }]);
+        setModalQueue(q => [
+          ...q,
+          {
+            type: 'combat' as const,
+            result: enriched,
+            perspective: 'attacker' as const,
+            ...(canRepeatAttack ? { repeatAttack: { fromId: data.fromId, toId: data.toId } } : {}),
+          },
+        ]);
         ownTurnCombatsRef.current.push(enriched);
+        if (state?.settings?.tutorial && state.phase === 'attack') {
+          const stepId = TUTORIAL_STEPS[tutorialStepRef.current]?.id;
+          if (stepId === 'attack_do') {
+            setTutorialAttackAutoTick((n) => n + 1);
+          }
+        }
       } else if (isMyDefense) {
         setModalQueue(q => [...q, { type: 'combat' as const, result: enriched, perspective: 'defender' as const }]);
         otherTurnCombatsRef.current.push(enriched);
@@ -229,7 +304,6 @@ export default function GamePage() {
       }
 
       // Always append to combat log sidebar
-      const { attacker_losses, defender_losses, territory_captured } = data.result;
       let logEntry = `${attackerName} attacked ${toName} from ${fromName}`;
       if (attacker_losses > 0 && defender_losses > 0) {
         logEntry += ` — both sides lost ${attacker_losses === defender_losses ? `${attacker_losses}` : `${attacker_losses} and ${defender_losses}`} troops`;
@@ -269,15 +343,22 @@ export default function GamePage() {
       turn_count: number;
       players: Array<{ player_id: string; username: string; color: string; territory_count: number; is_eliminated: boolean; is_ai: boolean }>;
       win_probability_history?: Array<{ step: number; turn: number; probabilities: Record<string, number> }>;
+      rating_deltas?: Record<string, number>;
+      is_ranked?: boolean;
+      achievements_unlocked?: Record<string, string[]>;
     }) => {
+      const myId = userRef.current?.user_id;
       const gameOverData: GameOverModalData = {
         type: 'game_over',
-        isWinner: stats.winner_id === userRef.current?.user_id,
+        isWinner: stats.winner_id === myId,
         winnerName: stats.winner_name,
         winnerColor: stats.players.find(p => p.player_id === stats.winner_id)?.color ?? '#fff',
         turnCount: stats.turn_count,
         players: stats.players,
         win_probability_history: stats.win_probability_history,
+        rating_change: myId && stats.rating_deltas ? stats.rating_deltas[myId] : undefined,
+        is_ranked: stats.is_ranked,
+        achievements_unlocked: myId && stats.achievements_unlocked ? stats.achievements_unlocked[myId] : undefined,
       };
       setModalQueue(q => [...q, gameOverData]);
     });
@@ -318,6 +399,110 @@ export default function GamePage() {
       clearGame();
     };
   }, [gameId]);
+
+  // When auth hydrates after the first game:state, recompute draft so Place controls appear
+  useEffect(() => {
+    const gs = useGameStore.getState().gameState;
+    const uid = user?.user_id;
+    if (!gs || !uid) return;
+    const prev = useGameStore.getState().draftUnitsRemaining;
+    setDraftUnitsRemaining(computeDraftPool(gs, uid, prev));
+  }, [user?.user_id, gameState?.draft_units_remaining, gameState?.phase, gameState?.current_player_index, gameState?.turn_number]);
+
+  // Tutorial: keep server phase aligned with the current card (draft→attack, attack→fortify)
+  useEffect(() => {
+    if (!isTutorial || !gameId || !gameState || !user?.user_id) return;
+    const myId = user.user_id;
+    const isMyTurn = gameState.players[gameState.current_player_index]?.player_id === myId;
+    if (!isMyTurn) return;
+
+    if (gameState.phase === 'attack') tutorialDraftToAttackPendingRef.current = false;
+    if (gameState.phase === 'fortify') tutorialAttackToFortifyPendingRef.current = false;
+
+    const sid = TUTORIAL_STEPS[tutorialStep]?.id;
+    if (!sid) return;
+
+    const draftLeft = computeDraftPool(gameState, myId, draftUnitsRemaining);
+    const socket = getSocket();
+
+    if ((sid === 'attack_explain' || sid === 'attack_do') && gameState.phase === 'draft' && draftLeft === 0) {
+      if (tutorialDraftToAttackPendingRef.current) return;
+      tutorialDraftToAttackPendingRef.current = true;
+      socket.emit('game:advance_phase', { gameId });
+      return;
+    }
+
+    if (sid === 'fortify_explain' && gameState.phase === 'attack') {
+      if (tutorialAttackToFortifyPendingRef.current) return;
+      tutorialAttackToFortifyPendingRef.current = true;
+      socket.emit('game:advance_phase', { gameId });
+    }
+  }, [
+    isTutorial,
+    gameId,
+    gameState,
+    tutorialStep,
+    user?.user_id,
+    draftUnitsRemaining,
+  ]);
+
+  useEffect(() => {
+    tutorialAttackPhaseAutoEmittedRef.current = false;
+    tutorialFortifyEndEmittedRef.current = false;
+    tutorialFortifyScheduleStartedRef.current = false;
+  }, [tutorialStep]);
+
+  // Tutorial attack_do: auto advance attack → fortify shortly after the player's first attack
+  useEffect(() => {
+    if (!isTutorial || !gameId || !user?.user_id) return;
+    if (tutorialAttackAutoTick === 0) return;
+    const gs = useGameStore.getState().gameState;
+    if (!gs || TUTORIAL_STEPS[tutorialStep]?.id !== 'attack_do') return;
+    if (gs.phase !== 'attack') return;
+    if (gs.players[gs.current_player_index]?.player_id !== user.user_id) return;
+    if (tutorialAttackPhaseAutoEmittedRef.current) return;
+
+    const t = window.setTimeout(() => {
+      const live = useGameStore.getState().gameState;
+      if (live?.phase !== 'attack') return;
+      if (tutorialAttackPhaseAutoEmittedRef.current) return;
+      tutorialAttackPhaseAutoEmittedRef.current = true;
+      getSocket().emit('game:advance_phase', { gameId });
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [tutorialAttackAutoTick, isTutorial, gameId, tutorialStep, user?.user_id]);
+
+  // If the player never attacks, still leave attack phase after 18s (deps avoid resetting on every game:state tick)
+  useEffect(() => {
+    if (!isTutorial || !gameId || !gameState || !user?.user_id) return;
+    if (TUTORIAL_STEPS[tutorialStep]?.id !== 'attack_do') return;
+    if (gameState.phase !== 'attack') return;
+    if (gameState.players[gameState.current_player_index]?.player_id !== user.user_id) return;
+
+    const t = window.setTimeout(() => {
+      if (tutorialAttackPhaseAutoEmittedRef.current) return;
+      tutorialAttackPhaseAutoEmittedRef.current = true;
+      getSocket().emit('game:advance_phase', { gameId });
+    }, 18000);
+    return () => window.clearTimeout(t);
+  }, [isTutorial, gameId, tutorialStep, gameState?.phase, user?.user_id]);
+
+  // Tutorial fortify_explain: auto end turn (fortify → next) so user is not stuck on "End Turn"
+  useEffect(() => {
+    if (!isTutorial || !gameId || !gameState || !user?.user_id) return;
+    if (TUTORIAL_STEPS[tutorialStep]?.id !== 'fortify_explain') return;
+    if (gameState.phase !== 'fortify') return;
+    if (gameState.players[gameState.current_player_index]?.player_id !== user.user_id) return;
+    if (tutorialFortifyScheduleStartedRef.current) return;
+    tutorialFortifyScheduleStartedRef.current = true;
+
+    const t = window.setTimeout(() => {
+      if (tutorialFortifyEndEmittedRef.current) return;
+      tutorialFortifyEndEmittedRef.current = true;
+      getSocket().emit('game:advance_phase', { gameId });
+    }, 2200);
+    return () => window.clearTimeout(t);
+  }, [isTutorial, gameId, tutorialStep, gameState?.phase, user?.user_id]);
 
   // ── Load map data ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -394,7 +579,9 @@ export default function GamePage() {
 
   const handleDraft = (territoryId: string, units: number) => {
     getSocket().emit('game:draft', { gameId, territoryId, units });
-    const curr = useGameStore.getState().draftUnitsRemaining;
+    const gs = useGameStore.getState().gameState;
+    const uid = useAuthStore.getState().user?.user_id;
+    const curr = computeDraftPool(gs, uid, useGameStore.getState().draftUnitsRemaining);
     const remaining = Math.max(0, curr - units);
     setDraftUnitsRemaining(remaining);
     setSelectedTerritory(null);
@@ -471,6 +658,23 @@ export default function GamePage() {
     dismissModal();
     navigate('/lobby');
   };
+
+  const handleTutorialContinuePlaying = useCallback(() => {
+    setTutorialStep(TUTORIAL_STEPS.length);
+  }, []);
+
+  const handleTutorialReturnToLobby = useCallback(async () => {
+    if (!gameId) return;
+    try {
+      await api.delete(`/games/${gameId}/abandon`);
+      toast.success('Tutorial ended. Welcome back to the lobby.');
+    } catch {
+      toast.error('Could not end the tutorial game. You can remove it from the lobby if it appears.');
+    }
+    getSocket().emit('game:leave', { gameId });
+    clearGame();
+    navigate('/lobby');
+  }, [gameId, navigate, clearGame]);
 
   // ── Waiting lobby ─────────────────────────────────────────────────────────
   if (!gameStarted || !gameState) {
@@ -592,10 +796,21 @@ export default function GamePage() {
         data={modalQueue[0] ?? null}
         onDismiss={modalQueue[0]?.type === 'game_over' ? handleGameOverDismiss : dismissModal}
         onResignConfirm={handleResignConfirm}
+        onRepeatCombat={handleAttack}
       />
 
       {/* Action Notification (auto-dismiss — reinforcements, fortify, phase changes) */}
       <ActionNotification key={notifState?.key} data={notifState?.data ?? null} />
+
+      {/* Tutorial Overlay */}
+      {isTutorial && tutorialStep < TUTORIAL_STEPS.length && (
+        <TutorialOverlay
+          stepIndex={tutorialStep}
+          onAdvance={() => setTutorialStep((s) => Math.min(s + 1, TUTORIAL_STEPS.length))}
+          onContinuePlaying={handleTutorialContinuePlaying}
+          onReturnToLobby={handleTutorialReturnToLobby}
+        />
+      )}
     </div>
   );
 }

@@ -367,6 +367,10 @@ Or run them individually in separate terminals as described in Quick Start.
 | `frontend/` | `pnpm run build` | Build for production |
 | `frontend/` | `pnpm run preview` | Preview production build |
 
+### Production (friends beta on the internet)
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for Docker Compose (nginx + API + databases), environment variables, HTTPS, and smoke testing.
+
 ---
 
 ## Game Mechanics Reference

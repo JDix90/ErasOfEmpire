@@ -6,6 +6,13 @@ import { getApiBaseUrl } from '../config/env';
 
 const rawHttp = axios.create({ baseURL: getApiBaseUrl(), withCredentials: true });
 
+export interface RatingInfo {
+  mu: number;
+  phi: number;
+  display: number;
+  provisional: boolean;
+}
+
 export interface AuthUser {
   user_id: string;
   username: string;
@@ -13,6 +20,9 @@ export interface AuthUser {
   xp: number;
   mmr: number;
   avatar_url?: string;
+  ratings?: { solo?: RatingInfo; ranked?: RatingInfo };
+  equipped_frame?: string | null;
+  equipped_marker?: string | null;
 }
 
 interface AuthState {

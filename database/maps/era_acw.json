@@ -1,0 +1,725 @@
+{
+  "map_id": "era_acw",
+  "name": "American Civil War (1861–1865)",
+  "description": "Union versus Confederacy: fight for the Eastern Theater, the Mississippi, and the Trans-Mississippi West.",
+  "era_theme": "acw",
+  "canvas_width": 1200,
+  "canvas_height": 700,
+  "globe_view": {
+    "lock_rotation": true,
+    "center_lat": 39,
+    "center_lng": -97,
+    "altitude": 1.2
+  },
+  "territories": [
+    {
+      "territory_id": "acw_new_england",
+      "name": "New England",
+      "polygon": [
+        [
+          0,
+          0
+        ],
+        [
+          200,
+          0
+        ],
+        [
+          200,
+          233
+        ],
+        [
+          0,
+          233
+        ]
+      ],
+      "center_point": [
+        100,
+        116.5
+      ],
+      "region_id": "union_northeast"
+    },
+    {
+      "territory_id": "acw_mid_atlantic",
+      "name": "Mid-Atlantic",
+      "polygon": [
+        [
+          200,
+          0
+        ],
+        [
+          400,
+          0
+        ],
+        [
+          400,
+          233
+        ],
+        [
+          200,
+          233
+        ]
+      ],
+      "center_point": [
+        300,
+        116.5
+      ],
+      "region_id": "union_northeast"
+    },
+    {
+      "territory_id": "acw_great_lakes",
+      "name": "Great Lakes",
+      "polygon": [
+        [
+          400,
+          0
+        ],
+        [
+          600,
+          0
+        ],
+        [
+          600,
+          233
+        ],
+        [
+          400,
+          233
+        ]
+      ],
+      "center_point": [
+        500,
+        116.5
+      ],
+      "region_id": "union_northeast"
+    },
+    {
+      "territory_id": "acw_appalachia",
+      "name": "Cumberland & Appalachia",
+      "polygon": [
+        [
+          600,
+          0
+        ],
+        [
+          800,
+          0
+        ],
+        [
+          800,
+          233
+        ],
+        [
+          600,
+          233
+        ]
+      ],
+      "center_point": [
+        700,
+        116.5
+      ],
+      "region_id": "border_upper"
+    },
+    {
+      "territory_id": "acw_upper_south",
+      "name": "Upper South",
+      "polygon": [
+        [
+          800,
+          0
+        ],
+        [
+          1000,
+          0
+        ],
+        [
+          1000,
+          233
+        ],
+        [
+          800,
+          233
+        ]
+      ],
+      "center_point": [
+        900,
+        116.5
+      ],
+      "region_id": "confederate_east"
+    },
+    {
+      "territory_id": "acw_carolinas",
+      "name": "The Carolinas",
+      "polygon": [
+        [
+          1000,
+          0
+        ],
+        [
+          1200,
+          0
+        ],
+        [
+          1200,
+          233
+        ],
+        [
+          1000,
+          233
+        ]
+      ],
+      "center_point": [
+        1100,
+        116.5
+      ],
+      "region_id": "confederate_east"
+    },
+    {
+      "territory_id": "acw_ohio_indiana",
+      "name": "Ohio & Indiana",
+      "polygon": [
+        [
+          0,
+          233
+        ],
+        [
+          200,
+          233
+        ],
+        [
+          200,
+          466
+        ],
+        [
+          0,
+          466
+        ]
+      ],
+      "center_point": [
+        100,
+        349.5
+      ],
+      "region_id": "union_midwest"
+    },
+    {
+      "territory_id": "acw_kentucky",
+      "name": "Kentucky",
+      "polygon": [
+        [
+          200,
+          233
+        ],
+        [
+          400,
+          233
+        ],
+        [
+          400,
+          466
+        ],
+        [
+          200,
+          466
+        ]
+      ],
+      "center_point": [
+        300,
+        349.5
+      ],
+      "region_id": "border_upper"
+    },
+    {
+      "territory_id": "acw_tennessee",
+      "name": "Tennessee",
+      "polygon": [
+        [
+          400,
+          233
+        ],
+        [
+          600,
+          233
+        ],
+        [
+          600,
+          466
+        ],
+        [
+          400,
+          466
+        ]
+      ],
+      "center_point": [
+        500,
+        349.5
+      ],
+      "region_id": "border_upper"
+    },
+    {
+      "territory_id": "acw_georgia_fl",
+      "name": "Georgia & Florida",
+      "polygon": [
+        [
+          600,
+          233
+        ],
+        [
+          800,
+          233
+        ],
+        [
+          800,
+          466
+        ],
+        [
+          600,
+          466
+        ]
+      ],
+      "center_point": [
+        700,
+        349.5
+      ],
+      "region_id": "confederate_east"
+    },
+    {
+      "territory_id": "acw_alabama",
+      "name": "Alabama",
+      "polygon": [
+        [
+          800,
+          233
+        ],
+        [
+          1000,
+          233
+        ],
+        [
+          1000,
+          466
+        ],
+        [
+          800,
+          466
+        ]
+      ],
+      "center_point": [
+        900,
+        349.5
+      ],
+      "region_id": "confederate_central"
+    },
+    {
+      "territory_id": "acw_mississippi",
+      "name": "Mississippi River",
+      "polygon": [
+        [
+          1000,
+          233
+        ],
+        [
+          1200,
+          233
+        ],
+        [
+          1200,
+          466
+        ],
+        [
+          1000,
+          466
+        ]
+      ],
+      "center_point": [
+        1100,
+        349.5
+      ],
+      "region_id": "confederate_central"
+    },
+    {
+      "territory_id": "acw_plains",
+      "name": "Great Plains",
+      "polygon": [
+        [
+          0,
+          466
+        ],
+        [
+          200,
+          466
+        ],
+        [
+          200,
+          699
+        ],
+        [
+          0,
+          699
+        ]
+      ],
+      "center_point": [
+        100,
+        582.5
+      ],
+      "region_id": "union_midwest"
+    },
+    {
+      "territory_id": "acw_missouri",
+      "name": "Missouri",
+      "polygon": [
+        [
+          200,
+          466
+        ],
+        [
+          400,
+          466
+        ],
+        [
+          400,
+          699
+        ],
+        [
+          200,
+          699
+        ]
+      ],
+      "center_point": [
+        300,
+        582.5
+      ],
+      "region_id": "union_midwest"
+    },
+    {
+      "territory_id": "acw_arkansas",
+      "name": "Arkansas",
+      "polygon": [
+        [
+          400,
+          466
+        ],
+        [
+          600,
+          466
+        ],
+        [
+          600,
+          699
+        ],
+        [
+          400,
+          699
+        ]
+      ],
+      "center_point": [
+        500,
+        582.5
+      ],
+      "region_id": "confederate_west"
+    },
+    {
+      "territory_id": "acw_louisiana",
+      "name": "Louisiana & Gulf",
+      "polygon": [
+        [
+          600,
+          466
+        ],
+        [
+          800,
+          466
+        ],
+        [
+          800,
+          699
+        ],
+        [
+          600,
+          699
+        ]
+      ],
+      "center_point": [
+        700,
+        582.5
+      ],
+      "region_id": "confederate_central"
+    },
+    {
+      "territory_id": "acw_texas",
+      "name": "Texas",
+      "polygon": [
+        [
+          800,
+          466
+        ],
+        [
+          1000,
+          466
+        ],
+        [
+          1000,
+          699
+        ],
+        [
+          800,
+          699
+        ]
+      ],
+      "center_point": [
+        900,
+        582.5
+      ],
+      "region_id": "confederate_west"
+    },
+    {
+      "territory_id": "acw_far_west",
+      "name": "Far West & Pacific",
+      "polygon": [
+        [
+          1000,
+          466
+        ],
+        [
+          1200,
+          466
+        ],
+        [
+          1200,
+          699
+        ],
+        [
+          1000,
+          699
+        ]
+      ],
+      "center_point": [
+        1100,
+        582.5
+      ],
+      "region_id": "confederate_west"
+    }
+  ],
+  "connections": [
+    {
+      "from": "acw_alabama",
+      "to": "acw_georgia_fl",
+      "type": "land"
+    },
+    {
+      "from": "acw_alabama",
+      "to": "acw_mississippi",
+      "type": "land"
+    },
+    {
+      "from": "acw_alabama",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_appalachia",
+      "to": "acw_kentucky",
+      "type": "land"
+    },
+    {
+      "from": "acw_appalachia",
+      "to": "acw_mid_atlantic",
+      "type": "land"
+    },
+    {
+      "from": "acw_appalachia",
+      "to": "acw_ohio_indiana",
+      "type": "land"
+    },
+    {
+      "from": "acw_appalachia",
+      "to": "acw_upper_south",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_louisiana",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_mississippi",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_missouri",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_plains",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_arkansas",
+      "to": "acw_texas",
+      "type": "land"
+    },
+    {
+      "from": "acw_carolinas",
+      "to": "acw_georgia_fl",
+      "type": "land"
+    },
+    {
+      "from": "acw_carolinas",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_carolinas",
+      "to": "acw_upper_south",
+      "type": "land"
+    },
+    {
+      "from": "acw_far_west",
+      "to": "acw_plains",
+      "type": "land"
+    },
+    {
+      "from": "acw_far_west",
+      "to": "acw_texas",
+      "type": "land"
+    },
+    {
+      "from": "acw_georgia_fl",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_great_lakes",
+      "to": "acw_kentucky",
+      "type": "land"
+    },
+    {
+      "from": "acw_great_lakes",
+      "to": "acw_missouri",
+      "type": "land"
+    },
+    {
+      "from": "acw_great_lakes",
+      "to": "acw_ohio_indiana",
+      "type": "land"
+    },
+    {
+      "from": "acw_great_lakes",
+      "to": "acw_plains",
+      "type": "land"
+    },
+    {
+      "from": "acw_kentucky",
+      "to": "acw_missouri",
+      "type": "land"
+    },
+    {
+      "from": "acw_kentucky",
+      "to": "acw_ohio_indiana",
+      "type": "land"
+    },
+    {
+      "from": "acw_kentucky",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_kentucky",
+      "to": "acw_upper_south",
+      "type": "land"
+    },
+    {
+      "from": "acw_louisiana",
+      "to": "acw_mississippi",
+      "type": "land"
+    },
+    {
+      "from": "acw_louisiana",
+      "to": "acw_texas",
+      "type": "land"
+    },
+    {
+      "from": "acw_mid_atlantic",
+      "to": "acw_new_england",
+      "type": "land"
+    },
+    {
+      "from": "acw_mid_atlantic",
+      "to": "acw_ohio_indiana",
+      "type": "land"
+    },
+    {
+      "from": "acw_mid_atlantic",
+      "to": "acw_upper_south",
+      "type": "land"
+    },
+    {
+      "from": "acw_mississippi",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_missouri",
+      "to": "acw_plains",
+      "type": "land"
+    },
+    {
+      "from": "acw_missouri",
+      "to": "acw_tennessee",
+      "type": "land"
+    },
+    {
+      "from": "acw_plains",
+      "to": "acw_texas",
+      "type": "land"
+    },
+    {
+      "from": "acw_tennessee",
+      "to": "acw_upper_south",
+      "type": "land"
+    }
+  ],
+  "regions": [
+    {
+      "region_id": "union_northeast",
+      "name": "Union — Northeast & Lakes",
+      "bonus": 4
+    },
+    {
+      "region_id": "union_midwest",
+      "name": "Union — Midwest",
+      "bonus": 4
+    },
+    {
+      "region_id": "border_upper",
+      "name": "Border States",
+      "bonus": 3
+    },
+    {
+      "region_id": "confederate_east",
+      "name": "Confederacy — Atlantic",
+      "bonus": 4
+    },
+    {
+      "region_id": "confederate_central",
+      "name": "Confederacy — Gulf & River",
+      "bonus": 4
+    },
+    {
+      "region_id": "confederate_west",
+      "name": "Confederacy — Trans-Mississippi",
+      "bonus": 3
+    }
+  ],
+  "is_public": true,
+  "is_moderated": true,
+  "moderation_status": "approved",
+  "creator_id": "system"
+}

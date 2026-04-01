@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import type { Db } from 'mongodb';
 import { config } from '../../config';
 
 export async function connectMongo(): Promise<void> {
@@ -7,7 +6,7 @@ export async function connectMongo(): Promise<void> {
   console.log('[MongoDB] Connected successfully');
 }
 
-export function getDb(): Db {
+export function getDb(): mongoose.mongo.Db {
   const db = mongoose.connection.db;
   if (!db) throw new Error('MongoDB not connected');
   return db;

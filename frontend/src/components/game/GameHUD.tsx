@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
 import { Shield, Sword, ArrowRight, Clock, Users, CreditCard, Flag, Save } from 'lucide-react';
 import clsx from 'clsx';
+import { computeDraftPool } from '../../utils/draftPool';
 
 interface GameHUDProps {
   onAdvancePhase: () => void;
@@ -35,6 +36,7 @@ export default function GameHUD({ onAdvancePhase, onRedeemCards, onResign, onSav
   const isMyTurn = gameState?.players[gameState.current_player_index]?.player_id === user?.user_id;
   const currentPlayer = gameState?.players[gameState?.current_player_index ?? 0];
   const myPlayer = gameState?.players.find((p) => p.player_id === user?.user_id);
+  const draftPool = computeDraftPool(gameState, user?.user_id, draftUnitsRemaining);
 
   // Turn timer countdown
   useEffect(() => {
@@ -95,7 +97,7 @@ export default function GameHUD({ onAdvancePhase, onRedeemCards, onResign, onSav
         )}
         {gameState.phase === 'draft' && isMyTurn && (
           <p className="text-cc-gold text-sm mt-2 font-medium">
-            {draftUnitsRemaining} units to place
+            {draftPool} units to place
           </p>
         )}
       </div>

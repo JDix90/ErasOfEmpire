@@ -13,6 +13,7 @@ import { usersRoutes } from './modules/users/users.routes';
 import { gamesRoutes } from './modules/games/games.routes';
 import { mapsRoutes } from './modules/maps/maps.routes';
 import { initGameSocket } from './sockets/gameSocket';
+import { matchmakingRoutes, setMatchmakingIo, startMatchmakingSweep } from './modules/matchmaking/matchmaking.routes';
 
 async function bootstrap(): Promise<void> {
   // ── Connect to databases ─────────────────────────────────────────────────
@@ -58,6 +59,7 @@ async function bootstrap(): Promise<void> {
   await app.register(usersRoutes, { prefix: '/api/users' });
   await app.register(gamesRoutes, { prefix: '/api/games' });
   await app.register(mapsRoutes, { prefix: '/api/maps' });
+  await app.register(matchmakingRoutes, { prefix: '/api/matchmaking' });
 
   // ── Health check ─────────────────────────────────────────────────────────
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -66,6 +68,8 @@ async function bootstrap(): Promise<void> {
   await app.ready();
   const httpServer = app.server;
   const io = initGameSocket(httpServer);
+  setMatchmakingIo(io);
+  startMatchmakingSweep();
 
   httpServer.listen(config.port, '0.0.0.0', () => {
     console.log(`\n🚀 ChronoConquest backend running on http://localhost:${config.port}`);

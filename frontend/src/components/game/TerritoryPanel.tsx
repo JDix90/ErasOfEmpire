@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
 import { Shield, Sword, X } from 'lucide-react';
 import clsx from 'clsx';
+import { computeDraftPool } from '../../utils/draftPool';
 
 interface TerritoryPanelProps {
   mapTerritories: Array<{
@@ -27,6 +28,13 @@ export default function TerritoryPanel({
   const { user } = useAuthStore();
   const [draftAmount, setDraftAmount] = React.useState(1);
   const [fortifyAmount, setFortifyAmount] = React.useState(1);
+
+  const draftPool = gameState
+    ? computeDraftPool(gameState, user?.user_id, draftUnitsRemaining)
+    : 0;
+  React.useEffect(() => {
+    setDraftAmount((a) => (draftPool <= 0 ? 1 : Math.min(draftPool, Math.max(1, a))));
+  }, [draftPool]);
 
   if (!selectedTerritory || !gameState) return null;
 
@@ -70,17 +78,17 @@ export default function TerritoryPanel({
       {isMyTurn && (
         <div className="space-y-3">
           {/* Draft */}
-          {isMine && gameState.phase === 'draft' && draftUnitsRemaining > 0 && (
+          {isMine && gameState.phase === 'draft' && draftPool > 0 && (
             <div>
-              <label className="label text-xs">Place Reinforcements ({draftUnitsRemaining} remaining)</label>
+              <label className="label text-xs">Place Reinforcements ({draftPool} remaining)</label>
               <div className="flex gap-2">
                 <input
                   type="number"
                   className="input text-sm py-1.5 flex-1"
                   min={1}
-                  max={draftUnitsRemaining}
+                  max={draftPool}
                   value={draftAmount}
-                  onChange={(e) => setDraftAmount(Math.min(draftUnitsRemaining, Math.max(1, Number(e.target.value))))}
+                  onChange={(e) => setDraftAmount(Math.min(draftPool, Math.max(1, Number(e.target.value))))}
                 />
                 <button
                   className="btn-primary text-sm py-1.5 px-4"

@@ -187,6 +187,8 @@ export default function MapHubPage() {
                 <option value="discovery">Age of Discovery</option>
                 <option value="ww2">World War II</option>
                 <option value="coldwar">Cold War</option>
+                <option value="modern">Modern</option>
+                <option value="acw">American Civil War</option>
                 <option value="custom">Custom</option>
               </select>
             </div>
