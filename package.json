@@ -5,7 +5,8 @@
   "description": "ChronoConquest - Historical World Map Strategy Game",
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "packages/shared"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -17,6 +18,8 @@
     "db:migrate": "npm run migrate --workspace=backend",
     "db:seed": "npm run seed --workspace=backend",
     "seed:maps": "pnpm -C backend run seed:maps",
+    "validate:maps": "pnpm -C backend run validate:maps",
+    "test:backend": "pnpm -C backend run test",
     "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend",
     "docker:prod:build": "test -f .env.production || cp .env.production.example .env.production; docker compose -f docker/docker-compose.prod.yml --env-file .env.production build",
     "docker:prod:up": "test -f .env.production || cp .env.production.example .env.production; docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d",

@@ -1,8 +1,15 @@
 /**
  * Builds the same GeoJSON geometry per territory as GlobeMap (countries/states/Risorgimento/ACW/canvas).
  * Used by GlobeMap rendering and by scripts that derive land adjacency from globe borders.
+ *
+ * IMPORTANT: Canvas `polygon` coords are in map pixel space (0…canvas_w, 0…canvas_h) relative to
+ * `projection_bounds` when the map was authored — NOT full-world equirectangular. If `geo_polygon`
+ * is missing, we must use `projection_bounds` for the canvas→WGS84 fallback. The old
+ * world-spanning fallback placed regional maps at wrong longitudes and caused chaotic overlaps on the globe.
  */
 
+import rewind from '@turf/rewind';
+import { polygon as turfPolygon } from '@turf/helpers';
 import {
   TERRITORY_GEO_CONFIG,
   TERRITORY_ISO_MAP,
@@ -13,6 +20,7 @@ import { ACW_TERRITORY_STATES } from '../data/acwStateMap';
 import { RISORGIMENTO_TERRITORY_PARTS } from '../data/risorgimentoRegionMap';
 import { clipToBbox } from './geoClip';
 import { unionGeoJsonGeometries } from './geoUnion';
+
 /** Minimal territory shape for geometry building (matches GameMap + GlobeMap props). */
 export interface GlobeTerritoryInput {
   territory_id: string;
@@ -25,6 +33,13 @@ export interface GlobeTerritoryInput {
   geo_polygon?: [number, number][];
 }
 
+export interface ProjectionBounds {
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+}
+
 export interface PolygonData {
   territory_id: string;
   name: string;
@@ -33,11 +48,8 @@ export interface PolygonData {
 
 type TerritoryRow = GlobeTerritoryInput;
 
-function canvasToGeoJSON(
-  polygon: number[][],
-  canvasW: number,
-  canvasH: number,
-): [number, number][] {
+/** Legacy full-world canvas → lon/lat (only valid when the map truly uses world equirectangular layout). */
+function canvasToGeoJSONWorld(polygon: number[][], canvasW: number, canvasH: number): [number, number][] {
   return polygon.map(([x, y]) => {
     const lng = (x / canvasW) * 360 - 180;
     const lat = 90 - (y / canvasH) * 180;
@@ -45,9 +57,22 @@ function canvasToGeoJSON(
   });
 }
 
-function getPolygonCoordinates(
-  geom: GeoJSON.Polygon | GeoJSON.MultiPolygon,
-): GeoJSON.Position[][][] {
+/** Inverse of map authoring: canvas pixel → WGS84 using the same `projection_bounds` as the JSON builder. */
+function canvasToGeoJSONRegional(
+  polygon: number[][],
+  canvasW: number,
+  canvasH: number,
+  b: ProjectionBounds,
+): [number, number][] {
+  const { minLng, maxLng, minLat, maxLat } = b;
+  return polygon.map(([x, y]) => {
+    const lng = minLng + (x / canvasW) * (maxLng - minLng);
+    const lat = maxLat - (y / canvasH) * (maxLat - minLat);
+    return [lng, lat];
+  });
+}
+
+function getPolygonCoordinates(geom: GeoJSON.Polygon | GeoJSON.MultiPolygon): GeoJSON.Position[][][] {
   if (geom.type === 'Polygon') return [geom.coordinates];
   return geom.coordinates;
 }
@@ -56,11 +81,15 @@ function centerPlaceholderGeometry(
   centerPoint: [number, number],
   canvasW: number,
   canvasH: number,
+  projectionBounds?: ProjectionBounds,
 ): GeoJSON.Polygon {
   const cx = centerPoint[0];
   const cy = centerPoint[1];
-  const cLng = (cx / canvasW) * 360 - 180;
-  const cLat = 90 - (cy / canvasH) * 180;
+  const b: ProjectionBounds =
+    projectionBounds ?? { minLng: -180, maxLng: 180, minLat: -90, maxLat: 90 };
+  const c = canvasToGeoJSONRegional([[cx, cy]], canvasW, canvasH, b);
+  const cLng = c[0][0];
+  const cLat = c[0][1];
   const d = 0.01;
   return {
     type: 'Polygon',
@@ -76,9 +105,7 @@ function centerPlaceholderGeometry(
   };
 }
 
-function mergeGeometries(
-  geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[],
-): GeoJSON.MultiPolygon {
+function mergeGeometries(geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[]): GeoJSON.MultiPolygon {
   const polygons: GeoJSON.Position[][][] = [];
   for (const geom of geometries) {
     for (const poly of getPolygonCoordinates(geom)) {
@@ -90,21 +117,63 @@ function mergeGeometries(
   return { type: 'MultiPolygon', coordinates: polygons };
 }
 
+/**
+ * Normalize API `geo_polygon` / canvas rings into GeoJSON Polygon.
+ * Always run @turf/rewind: community map rects are often authored clockwise (SW→SE→NE→NW).
+ * Skipping rewind kept “bit-identical” coords but broke RFC 7946 exterior orientation; three-globe’s
+ * conic polygon caps then triangulate incorrectly (spiky / exploded caps on the globe).
+ */
+function ringToPolygonGeometry(ringInput: [number, number][]): GeoJSON.Polygon {
+  let ring: [number, number][] = ringInput.map((p) => [Number(p[0]), Number(p[1])]);
+  if (ring.length < 3) {
+    return { type: 'Polygon', coordinates: [ring] };
+  }
+  const first0 = ring[0];
+  const last0 = ring[ring.length - 1];
+  if (first0[0] === last0[0] && first0[1] === last0[1]) {
+    ring = ring.slice(0, -1);
+  }
+  if (ring.length < 3) {
+    return { type: 'Polygon', coordinates: [ringInput] };
+  }
+
+  const closed: [number, number][] = [...ring, ring[0]];
+  try {
+    const feat = turfPolygon([closed]);
+    const rewound = rewind(feat) as GeoJSON.Feature<GeoJSON.Polygon>;
+    if (rewound.geometry?.type === 'Polygon') {
+      return rewound.geometry;
+    }
+  } catch {
+    /* fall through */
+  }
+  return { type: 'Polygon', coordinates: [closed] };
+}
+
 export interface GlobeGeometryInputs {
   countriesGeo: GeoJSON.FeatureCollection | null;
   statesGeo: GeoJSON.FeatureCollection | null;
   risorgimentoGeo: GeoJSON.FeatureCollection | null;
 }
 
+export interface GlobeMapDataForGeometry {
+  canvas_width?: number;
+  canvas_height?: number;
+  /** When set, canvas `polygon` coords map through these bounds (same as JSON `projection_bounds`). */
+  projection_bounds?: ProjectionBounds;
+  territories: GlobeTerritoryInput[];
+}
+
 /**
  * Build globe geometry for every territory — mirrors GlobeMap `polygonsData` logic.
  */
 export function buildTerritoryGlobeGeometries(
-  mapData: { canvas_width?: number; canvas_height?: number; territories: GlobeTerritoryInput[] },
+  mapData: GlobeMapDataForGeometry,
   { countriesGeo, statesGeo, risorgimentoGeo }: GlobeGeometryInputs,
 ): PolygonData[] {
   const canvasW = mapData.canvas_width ?? 1200;
   const canvasH = mapData.canvas_height ?? 700;
+  const regionalBounds = mapData.projection_bounds;
 
   const isoToFeatures = new Map<string, GeoJSON.Feature[]>();
   if (countriesGeo?.features) {
@@ -152,13 +221,29 @@ export function buildTerritoryGlobeGeometries(
   return mapData.territories.map((raw) => {
     const territory = raw as TerritoryRow;
 
+    // Explicit map-authored rings always win (community maps, editor drawings).
+    if (territory.geo_polygon && territory.geo_polygon.length >= 3) {
+      const ring: [number, number][] = [...territory.geo_polygon];
+      if (
+        ring[0][0] !== ring[ring.length - 1][0] ||
+        ring[0][1] !== ring[ring.length - 1][1]
+      ) {
+        ring.push([...ring[0]]);
+      }
+      return {
+        territory_id: territory.territory_id,
+        name: territory.name,
+        geometry: ringToPolygonGeometry(ring),
+      };
+    }
+
     const risParts = RISORGIMENTO_TERRITORY_PARTS[territory.territory_id];
     if (risParts) {
       if (risorgimentoGeo === null) {
         return {
           territory_id: territory.territory_id,
           name: territory.name,
-          geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH),
+          geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH, regionalBounds),
         };
       }
       if (iso3166ToGeom.size > 0) {
@@ -190,7 +275,7 @@ export function buildTerritoryGlobeGeometries(
         return {
           territory_id: territory.territory_id,
           name: territory.name,
-          geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH),
+          geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH, regionalBounds),
         };
       }
 
@@ -273,26 +358,13 @@ export function buildTerritoryGlobeGeometries(
       return {
         territory_id: territory.territory_id,
         name: territory.name,
-        geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH),
+        geometry: centerPlaceholderGeometry(territory.center_point, canvasW, canvasH, regionalBounds),
       };
     }
 
-    if (territory.geo_polygon && territory.geo_polygon.length >= 3) {
-      const ring: [number, number][] = [...territory.geo_polygon];
-      if (
-        ring[0][0] !== ring[ring.length - 1][0] ||
-        ring[0][1] !== ring[ring.length - 1][1]
-      ) {
-        ring.push([...ring[0]]);
-      }
-      return {
-        territory_id: territory.territory_id,
-        name: territory.name,
-        geometry: { type: 'Polygon', coordinates: [ring] },
-      };
-    }
-
-    const coords = canvasToGeoJSON(territory.polygon, canvasW, canvasH);
+    const coords = regionalBounds
+      ? canvasToGeoJSONRegional(territory.polygon, canvasW, canvasH, regionalBounds)
+      : canvasToGeoJSONWorld(territory.polygon, canvasW, canvasH);
     if (
       coords.length > 1 &&
       (coords[0][0] !== coords[coords.length - 1][0] ||
@@ -303,7 +375,7 @@ export function buildTerritoryGlobeGeometries(
     return {
       territory_id: territory.territory_id,
       name: territory.name,
-      geometry: { type: 'Polygon', coordinates: [coords] },
+      geometry: ringToPolygonGeometry(coords as [number, number][]),
     };
   });
 }

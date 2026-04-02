@@ -71,6 +71,9 @@ const ERA_LABELS: Record<string, string> = {
   ww2: 'World War II',
   coldwar: 'Cold War',
   modern: 'Modern Day',
+  acw: 'American Civil War',
+  risorgimento: 'Italian Unification',
+  custom: 'Community map',
 };
 
 const CATEGORY_TABS = [

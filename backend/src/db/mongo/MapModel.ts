@@ -40,6 +40,13 @@ export interface IGlobeView {
   altitude?: number;
 }
 
+export interface IProjectionBounds {
+  minLng: number;
+  maxLng: number;
+  minLat: number;
+  maxLat: number;
+}
+
 export interface ICustomMap extends Document {
   map_id: string;
   creator_id: string;
@@ -49,6 +56,8 @@ export interface ICustomMap extends Document {
   background_image_url?: string;
   canvas_width?: number;
   canvas_height?: number;
+  /** Canvas polygon coordinates are authored in this WGS84 box (same as JSON `projection_bounds`). */
+  projection_bounds?: IProjectionBounds;
   globe_view?: IGlobeView;
   territories: ITerritory[];
   connections: IConnection[];
@@ -100,6 +109,18 @@ const CustomMapSchema = new Schema<ICustomMap>(
     background_image_url: { type: String },
     canvas_width: { type: Number, default: 1200 },
     canvas_height: { type: Number, default: 700 },
+    projection_bounds: {
+      type: new Schema(
+        {
+          minLng: { type: Number, required: true },
+          maxLng: { type: Number, required: true },
+          minLat: { type: Number, required: true },
+          maxLat: { type: Number, required: true },
+        },
+        { _id: false },
+      ),
+      required: false,
+    },
     globe_view: {
       type: new Schema(
         {
@@ -133,5 +154,20 @@ CustomMapSchema.index({ creator_id: 1 });
 CustomMapSchema.index({ is_public: 1, moderation_status: 1 });
 CustomMapSchema.index({ rating: -1 });
 CustomMapSchema.index({ play_count: -1 });
+CustomMapSchema.index({ 'territories.territory_id': 1 });
+
+CustomMapSchema.pre('validate', function (next) {
+  const doc = this as ICustomMap;
+  for (const t of doc.territories ?? []) {
+    if (t.geo_polygon && t.geo_polygon.length > 0 && t.geo_polygon.length < 4) {
+      return next(
+        new Error(
+          `geo_polygon for territory "${t.territory_id}" must have at least 4 positions (closed ring).`,
+        ),
+      );
+    }
+  }
+  next();
+});
 
 export const CustomMap = mongoose.model<ICustomMap>('CustomMap', CustomMapSchema);

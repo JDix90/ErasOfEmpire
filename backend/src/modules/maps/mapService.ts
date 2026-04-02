@@ -14,6 +14,8 @@ export interface Territory {
   polygon: number[][];
   center_point: [number, number];
   region_id: string;
+  /** WGS84 ring — globe uses this when set */
+  geo_polygon?: [number, number][];
 }
 
 export interface Connection {
@@ -35,6 +37,12 @@ export interface GameMap {
   era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
   canvas_width: number;
   canvas_height: number;
+  projection_bounds?: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
   globe_view?: {
     lock_rotation?: boolean;
     center_lat?: number;

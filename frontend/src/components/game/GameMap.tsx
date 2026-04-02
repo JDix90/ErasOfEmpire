@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as PIXI from 'pixi.js';
 import { useGameStore } from '../../store/gameStore';
+import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { scalePolygon } from '../../services/mapService';
 
@@ -53,7 +54,8 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
   const territoryGraphicsRef = useRef<Map<string, PIXI.Graphics>>(new Map());
   const labelContainerRef = useRef<PIXI.Container | null>(null);
 
-  const { gameState, selectedTerritory, attackSource } = useGameStore();
+  const { gameState } = useGameStore();
+  const { selectedTerritory, attackSource } = useUiStore();
   const { user } = useAuthStore();
 
   // Compute map canvas dimensions (from data or bounding box of all polygons)

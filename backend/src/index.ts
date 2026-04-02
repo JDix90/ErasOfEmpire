@@ -1,35 +1,48 @@
 import 'dotenv/config';
+import { randomUUID } from 'crypto';
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import mongoose from 'mongoose';
 import fastifyCookie from '@fastify/cookie';
 import fastifyCors from '@fastify/cors';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyRateLimit from '@fastify/rate-limit';
+import type { Server } from 'socket.io';
 import { config } from './config';
-import { connectPostgres } from './db/postgres';
+import { validateProductionEnv } from './config/validateEnv';
+import { connectPostgres, pgPool } from './db/postgres';
 import { connectMongo } from './db/mongo';
-import { connectRedis } from './db/redis';
+import { connectRedis, redis } from './db/redis';
+import { registerErrorHandler } from './errorHandler';
 import { authRoutes } from './modules/auth/auth.routes';
 import { usersRoutes } from './modules/users/users.routes';
 import { gamesRoutes } from './modules/games/games.routes';
 import { mapsRoutes } from './modules/maps/maps.routes';
-import { initGameSocket } from './sockets/gameSocket';
-import { matchmakingRoutes, setMatchmakingIo, startMatchmakingSweep } from './modules/matchmaking/matchmaking.routes';
+import { initGameSocket, shutdownGameSocket } from './sockets/gameSocket';
+import {
+  matchmakingRoutes,
+  setMatchmakingIo,
+  startMatchmakingSweep,
+  stopMatchmakingSweep,
+} from './modules/matchmaking/matchmaking.routes';
 
 async function bootstrap(): Promise<void> {
-  // ── Connect to databases ─────────────────────────────────────────────────
+  validateProductionEnv();
+
   await connectPostgres();
   await connectMongo();
   await connectRedis();
 
-  // ── Create Fastify app ───────────────────────────────────────────────────
   const app = Fastify({
     logger: config.nodeEnv === 'development',
     trustProxy: true,
+    genReqId: () => randomUUID(),
   });
 
-  // ── Register plugins ─────────────────────────────────────────────────────
+  registerErrorHandler(app);
+
   await app.register(fastifyHelmet, {
-    contentSecurityPolicy: false, // Handled by frontend
+    contentSecurityPolicy: false,
   });
 
   await app.register(fastifyCors, {
@@ -54,27 +67,68 @@ async function bootstrap(): Promise<void> {
     }),
   });
 
-  // ── Register routes ──────────────────────────────────────────────────────
-  await app.register(authRoutes, { prefix: '/api/auth' });
+  await app.register(
+    async (scope) => {
+      await scope.register(fastifyRateLimit, {
+        max: 30,
+        timeWindow: '1 minute',
+        errorResponseBuilder: () => ({
+          error: 'Too many authentication attempts. Please wait and try again.',
+        }),
+      });
+      await scope.register(authRoutes);
+    },
+    { prefix: '/api/auth' },
+  );
+
   await app.register(usersRoutes, { prefix: '/api/users' });
   await app.register(gamesRoutes, { prefix: '/api/games' });
   await app.register(mapsRoutes, { prefix: '/api/maps' });
   await app.register(matchmakingRoutes, { prefix: '/api/matchmaking' });
 
-  // ── Health check ─────────────────────────────────────────────────────────
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
-  // ── Attach Socket.io to Fastify's HTTP server ────────────────────────────
   await app.ready();
-  const httpServer = app.server;
-  const io = initGameSocket(httpServer);
+  const io = initGameSocket(app.server);
   setMatchmakingIo(io);
   startMatchmakingSweep();
 
-  httpServer.listen(config.port, '0.0.0.0', () => {
-    console.log(`\n🚀 ChronoConquest backend running on http://localhost:${config.port}`);
-    console.log(`   Environment: ${config.nodeEnv}`);
-    console.log(`   CORS origins: ${config.corsOrigins.join(', ')}\n`);
+  await app.listen({ port: config.port, host: '0.0.0.0' });
+
+  console.log(`\n🚀 ChronoConquest backend running on http://localhost:${config.port}`);
+  console.log(`   Environment: ${config.nodeEnv}`);
+  console.log(`   CORS origins: ${config.corsOrigins.join(', ')}\n`);
+
+  setupGracefulShutdown(app, io);
+}
+
+function setupGracefulShutdown(app: FastifyInstance, io: Server): void {
+  let inProgress = false;
+
+  const shutdown = async (signal: string) => {
+    if (inProgress) return;
+    inProgress = true;
+    console.log(`\n[shutdown] Received ${signal}, draining...`);
+    try {
+      stopMatchmakingSweep();
+      await shutdownGameSocket(io);
+      await app.close();
+      await mongoose.connection.close();
+      await redis.quit();
+      await pgPool.end();
+      console.log('[shutdown] Clean exit');
+    } catch (err) {
+      console.error('[shutdown] Error during shutdown:', err);
+    } finally {
+      process.exit(0);
+    }
+  };
+
+  process.on('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+  process.on('SIGINT', () => {
+    void shutdown('SIGINT');
   });
 }
 

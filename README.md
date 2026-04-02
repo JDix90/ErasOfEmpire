@@ -465,6 +465,27 @@ Browser (React + PixiJS)
 
 ---
 
+## Troubleshooting
+
+| Symptom | Things to check |
+|--------|-------------------|
+| API calls fail or CORS errors | `FRONTEND_URL` and optional `CORS_ORIGINS` in `backend/.env` must include your web origin (e.g. `http://localhost:5173`). |
+| `401` on `/api/auth/refresh` | Refresh cookie `SameSite`/HTTPS: see `REFRESH_COOKIE_SAME_SITE` in `backend/.env.example`. Ensure frontend uses the Vite proxy or matching API URL. |
+| Socket disconnects or “Game not found” | Socket auth requires a valid access token in the handshake; URL `gameId` must match a Postgres game row. Rejoin is sent automatically on reconnect (see `GamePage.tsx`). |
+| Map not rendering | Run `pnpm run seed:maps` from `backend/` so MongoDB has map documents. For custom geometry issues, see [docs/GLOBE_2D_CHECKLIST.md](docs/GLOBE_2D_CHECKLIST.md). |
+| Consultant review assumed missing features | Several items (socket JWT, phase checks, fog filtering, refresh DB) are already implemented — see [docs/CODEBASE_STATUS.md](docs/CODEBASE_STATUS.md). |
+
+## Automated checks (backend)
+
+From the repository root:
+
+- `pnpm run test:backend` — Vitest unit tests (combat resolver, map connection validation).
+- `pnpm run validate:maps` — validates `database/maps/*.json` connection graph.
+
+Snapshot and restart behavior for ops: [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+---
+
 ## Development Notes
 
 ### Adding a New Historical Era

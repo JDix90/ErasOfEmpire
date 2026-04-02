@@ -18,6 +18,12 @@ interface PublicMap {
   created_at: string;
 }
 
+function formatCommunityUploader(creatorId: string): string {
+  if (creatorId === 'jmd') return 'JMD';
+  if (creatorId.length <= 3) return creatorId.toUpperCase();
+  return creatorId;
+}
+
 export default function MapHubPage() {
   const navigate = useNavigate();
 
@@ -189,7 +195,7 @@ export default function MapHubPage() {
                 <option value="coldwar">Cold War</option>
                 <option value="modern">Modern</option>
                 <option value="acw">American Civil War</option>
-                <option value="custom">Custom</option>
+                <option value="custom">Community / Regional</option>
               </select>
             </div>
           </div>
@@ -213,7 +219,7 @@ export default function MapHubPage() {
                       </h3>
                       {map.era_theme && (
                         <span className="badge bg-cc-dark text-cc-muted border border-cc-border text-xs mt-1 capitalize">
-                          {map.era_theme}
+                          {map.era_theme === 'custom' ? 'Regional' : map.era_theme}
                         </span>
                       )}
                     </div>
@@ -222,6 +228,10 @@ export default function MapHubPage() {
                   {map.description && (
                     <p className="text-cc-muted text-sm mb-3 line-clamp-2">{map.description}</p>
                   )}
+
+                  <p className="text-xs text-cc-muted/90 mb-3">
+                    Uploaded by <span className="text-cc-text">{formatCommunityUploader(map.creator_id)}</span>
+                  </p>
 
                   <div className="flex items-center justify-between text-xs text-cc-muted mb-4">
                     <span className="flex items-center gap-1">

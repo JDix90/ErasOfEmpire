@@ -2,13 +2,13 @@ import { randomInt } from 'crypto';
 import type { CombatResult } from '../../types';
 
 /**
- * Roll N cryptographically random six-sided dice.
+ * Roll N six-sided dice using `dieRoll` (defaults to crypto.randomInt).
  * Returns the results sorted in descending order.
  */
-function rollDice(count: number): number[] {
+function rollDice(count: number, dieRoll: () => number): number[] {
   const rolls: number[] = [];
   for (let i = 0; i < count; i++) {
-    rolls.push(randomInt(1, 7)); // 1–6 inclusive
+    rolls.push(dieRoll());
   }
   return rolls.sort((a, b) => b - a);
 }
@@ -20,12 +20,14 @@ function rollDice(count: number): number[] {
  * @param defendingUnits  Total units in the defending territory (must be >= 1)
  * @param attackerDiceOverride  Optional: override attacker dice count (for special units)
  * @param defenderDiceOverride  Optional: override defender dice count (for special units)
+ * @param dieRoll  Optional: inject dice rolls (1–6 per call), in order: all attacker dice then all defender dice. Used by tests; production uses crypto.randomInt.
  */
 export function resolveCombat(
   attackingUnits: number,
   defendingUnits: number,
   attackerDiceOverride?: number,
-  defenderDiceOverride?: number
+  defenderDiceOverride?: number,
+  dieRoll?: () => number
 ): CombatResult {
   if (attackingUnits < 2) {
     throw new Error('Attacker must have at least 2 units to attack');
@@ -38,8 +40,9 @@ export function resolveCombat(
   const attackerDice = attackerDiceOverride ?? Math.min(attackingUnits - 1, 3);
   const defenderDice = defenderDiceOverride ?? Math.min(defendingUnits, 2);
 
-  const attackerRolls = rollDice(attackerDice);
-  const defenderRolls = rollDice(defenderDice);
+  const rng = dieRoll ?? (() => randomInt(1, 7));
+  const attackerRolls = rollDice(attackerDice, rng);
+  const defenderRolls = rollDice(defenderDice, rng);
 
   let attackerLosses = 0;
   let defenderLosses = 0;

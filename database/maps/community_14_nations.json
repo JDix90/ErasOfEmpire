@@ -1,0 +1,1357 @@
+{
+  "map_id": "community_14_nations",
+  "name": "The 14 Nations",
+  "description": "North America and Central America only: non-overlapping regions from the Pacific to the Gulf and Atlantic coasts — California through the Great Basin, Diné & Apache lands, Sonoran desert, Great Plains, Mesoamerica, and Florida. Territory shapes are axis-aligned rectangles with shared edges where adjacent.",
+  "era_theme": "custom",
+  "canvas_width": 1200,
+  "canvas_height": 700,
+  "projection_bounds": {
+    "minLng": -127,
+    "maxLng": -78,
+    "minLat": 14,
+    "maxLat": 47
+  },
+  "globe_view": {
+    "lock_rotation": true,
+    "center_lat": 28.5,
+    "center_lng": -102,
+    "altitude": 1.48
+  },
+  "territories": [
+    {
+      "territory_id": "n14_klamath",
+      "name": "Klamath River Confederacy",
+      "geo_polygon": [
+        [
+          -124.55,
+          41.2
+        ],
+        [
+          -123.48,
+          41.2
+        ],
+        [
+          -123.48,
+          42.82
+        ],
+        [
+          -124.55,
+          42.82
+        ],
+        [
+          -124.55,
+          41.2
+        ]
+      ],
+      "polygon": [
+        [
+          60,
+          123.03
+        ],
+        [
+          86.204,
+          123.03
+        ],
+        [
+          86.204,
+          88.667
+        ],
+        [
+          60,
+          88.667
+        ],
+        [
+          60,
+          123.03
+        ]
+      ],
+      "center_point": [
+        73.1,
+        105.85
+      ],
+      "region_id": "region_california"
+    },
+    {
+      "territory_id": "n14_pomo_miwok",
+      "name": "Pomo-Miwok League",
+      "geo_polygon": [
+        [
+          -123.48,
+          36.75
+        ],
+        [
+          -122.035,
+          36.75
+        ],
+        [
+          -122.035,
+          40.22
+        ],
+        [
+          -123.48,
+          40.22
+        ],
+        [
+          -123.48,
+          36.75
+        ]
+      ],
+      "polygon": [
+        [
+          86.204,
+          217.424
+        ],
+        [
+          121.592,
+          217.424
+        ],
+        [
+          121.592,
+          143.818
+        ],
+        [
+          86.204,
+          143.818
+        ],
+        [
+          86.204,
+          217.424
+        ]
+      ],
+      "center_point": [
+        103.9,
+        180.62
+      ],
+      "region_id": "region_california"
+    },
+    {
+      "territory_id": "n14_chumash",
+      "name": "Chumash League",
+      "geo_polygon": [
+        [
+          -122.035,
+          33.85
+        ],
+        [
+          -119.05,
+          33.85
+        ],
+        [
+          -119.05,
+          36.75
+        ],
+        [
+          -122.035,
+          36.75
+        ],
+        [
+          -122.035,
+          33.85
+        ]
+      ],
+      "polygon": [
+        [
+          121.592,
+          278.939
+        ],
+        [
+          194.694,
+          278.939
+        ],
+        [
+          194.694,
+          217.424
+        ],
+        [
+          121.592,
+          217.424
+        ],
+        [
+          121.592,
+          278.939
+        ]
+      ],
+      "center_point": [
+        158.14,
+        248.18
+      ],
+      "region_id": "region_california"
+    },
+    {
+      "territory_id": "n14_great_valley",
+      "name": "Great Valley Confederacy",
+      "geo_polygon": [
+        [
+          -122.035,
+          36.75
+        ],
+        [
+          -119.05,
+          36.75
+        ],
+        [
+          -119.05,
+          40.22
+        ],
+        [
+          -122.035,
+          40.22
+        ],
+        [
+          -122.035,
+          36.75
+        ]
+      ],
+      "polygon": [
+        [
+          121.592,
+          217.424
+        ],
+        [
+          194.694,
+          217.424
+        ],
+        [
+          194.694,
+          143.818
+        ],
+        [
+          121.592,
+          143.818
+        ],
+        [
+          121.592,
+          217.424
+        ]
+      ],
+      "center_point": [
+        158.14,
+        180.62
+      ],
+      "region_id": "region_california"
+    },
+    {
+      "territory_id": "n14_great_basin",
+      "name": "Great Basin",
+      "geo_polygon": [
+        [
+          -118.02,
+          35.25
+        ],
+        [
+          -114.05,
+          35.25
+        ],
+        [
+          -114.05,
+          35.55
+        ],
+        [
+          -118.02,
+          35.55
+        ],
+        [
+          -118.02,
+          35.25
+        ]
+      ],
+      "polygon": [
+        [
+          219.918,
+          249.242
+        ],
+        [
+          317.143,
+          249.242
+        ],
+        [
+          317.143,
+          242.879
+        ],
+        [
+          219.918,
+          242.879
+        ],
+        [
+          219.918,
+          249.242
+        ]
+      ],
+      "center_point": [
+        268.53,
+        246.06
+      ],
+      "region_id": "region_basin"
+    },
+    {
+      "territory_id": "n14_dine",
+      "name": "Diné Bikéyah",
+      "geo_polygon": [
+        [
+          -114.05,
+          35.25
+        ],
+        [
+          -109.55,
+          35.25
+        ],
+        [
+          -109.55,
+          35.55
+        ],
+        [
+          -114.05,
+          35.55
+        ],
+        [
+          -114.05,
+          35.25
+        ]
+      ],
+      "polygon": [
+        [
+          317.143,
+          249.242
+        ],
+        [
+          427.347,
+          249.242
+        ],
+        [
+          427.347,
+          242.879
+        ],
+        [
+          317.143,
+          242.879
+        ],
+        [
+          317.143,
+          249.242
+        ]
+      ],
+      "center_point": [
+        372.24,
+        246.06
+      ],
+      "region_id": "region_aridoamerica"
+    },
+    {
+      "territory_id": "n14_apache_mesa",
+      "name": "Apache Heartland",
+      "geo_polygon": [
+        [
+          -109.55,
+          35.25
+        ],
+        [
+          -106.85,
+          35.25
+        ],
+        [
+          -106.85,
+          35.55
+        ],
+        [
+          -109.55,
+          35.55
+        ],
+        [
+          -109.55,
+          35.25
+        ]
+      ],
+      "polygon": [
+        [
+          427.347,
+          249.242
+        ],
+        [
+          493.469,
+          249.242
+        ],
+        [
+          493.469,
+          242.879
+        ],
+        [
+          427.347,
+          242.879
+        ],
+        [
+          427.347,
+          249.242
+        ]
+      ],
+      "center_point": [
+        460.41,
+        246.06
+      ],
+      "region_id": "region_aridoamerica"
+    },
+    {
+      "territory_id": "n14_sonoran",
+      "name": "Sonoran Desert",
+      "geo_polygon": [
+        [
+          -104.55,
+          23.435000000000002
+        ],
+        [
+          -103.85,
+          23.435000000000002
+        ],
+        [
+          -103.85,
+          33.12
+        ],
+        [
+          -104.55,
+          33.12
+        ],
+        [
+          -104.55,
+          23.435000000000002
+        ]
+      ],
+      "polygon": [
+        [
+          549.796,
+          499.864
+        ],
+        [
+          566.939,
+          499.864
+        ],
+        [
+          566.939,
+          294.424
+        ],
+        [
+          549.796,
+          294.424
+        ],
+        [
+          549.796,
+          499.864
+        ]
+      ],
+      "center_point": [
+        558.37,
+        397.14
+      ],
+      "region_id": "region_aridoamerica"
+    },
+    {
+      "territory_id": "n14_wixarika",
+      "name": "Wixárika Confederacy",
+      "geo_polygon": [
+        [
+          -104.55,
+          19.1
+        ],
+        [
+          -103.85,
+          19.1
+        ],
+        [
+          -103.85,
+          23.435000000000002
+        ],
+        [
+          -104.55,
+          23.435000000000002
+        ],
+        [
+          -104.55,
+          19.1
+        ]
+      ],
+      "polygon": [
+        [
+          549.796,
+          591.818
+        ],
+        [
+          566.939,
+          591.818
+        ],
+        [
+          566.939,
+          499.864
+        ],
+        [
+          549.796,
+          499.864
+        ],
+        [
+          549.796,
+          591.818
+        ]
+      ],
+      "center_point": [
+        558.37,
+        545.84
+      ],
+      "region_id": "region_mexico"
+    },
+    {
+      "territory_id": "n14_collima",
+      "name": "Kingdom of Collima",
+      "geo_polygon": [
+        [
+          -104.55,
+          17.95
+        ],
+        [
+          -103.85,
+          17.95
+        ],
+        [
+          -103.85,
+          19.1
+        ],
+        [
+          -104.55,
+          19.1
+        ],
+        [
+          -104.55,
+          17.95
+        ]
+      ],
+      "polygon": [
+        [
+          549.796,
+          616.212
+        ],
+        [
+          566.939,
+          616.212
+        ],
+        [
+          566.939,
+          591.818
+        ],
+        [
+          549.796,
+          591.818
+        ],
+        [
+          549.796,
+          616.212
+        ]
+      ],
+      "center_point": [
+        558.37,
+        604.02
+      ],
+      "region_id": "region_mexico"
+    },
+    {
+      "territory_id": "n14_yucu_dzaa",
+      "name": "Kingdom of Yucu Dzaa",
+      "geo_polygon": [
+        [
+          -98.35,
+          15.82
+        ],
+        [
+          -97.025,
+          15.82
+        ],
+        [
+          -97.025,
+          17.22
+        ],
+        [
+          -98.35,
+          17.22
+        ],
+        [
+          -98.35,
+          15.82
+        ]
+      ],
+      "polygon": [
+        [
+          701.633,
+          661.394
+        ],
+        [
+          734.082,
+          661.394
+        ],
+        [
+          734.082,
+          631.697
+        ],
+        [
+          701.633,
+          631.697
+        ],
+        [
+          701.633,
+          661.394
+        ]
+      ],
+      "center_point": [
+        717.86,
+        646.55
+      ],
+      "region_id": "region_mexico"
+    },
+    {
+      "territory_id": "n14_zaachila",
+      "name": "Kingdom of Zaachila",
+      "geo_polygon": [
+        [
+          -97.025,
+          15.82
+        ],
+        [
+          -95.28,
+          15.82
+        ],
+        [
+          -95.28,
+          17.22
+        ],
+        [
+          -97.025,
+          17.22
+        ],
+        [
+          -97.025,
+          15.82
+        ]
+      ],
+      "polygon": [
+        [
+          734.082,
+          661.394
+        ],
+        [
+          776.816,
+          661.394
+        ],
+        [
+          776.816,
+          631.697
+        ],
+        [
+          734.082,
+          631.697
+        ],
+        [
+          734.082,
+          661.394
+        ]
+      ],
+      "center_point": [
+        755.45,
+        646.55
+      ],
+      "region_id": "region_mexico"
+    },
+    {
+      "territory_id": "n14_northern_plains",
+      "name": "Northern Plains",
+      "geo_polygon": [
+        [
+          -99.35,
+          40.15
+        ],
+        [
+          -96.85,
+          40.15
+        ],
+        [
+          -96.85,
+          44.05
+        ],
+        [
+          -99.35,
+          44.05
+        ],
+        [
+          -99.35,
+          40.15
+        ]
+      ],
+      "polygon": [
+        [
+          677.143,
+          145.303
+        ],
+        [
+          738.367,
+          145.303
+        ],
+        [
+          738.367,
+          62.576
+        ],
+        [
+          677.143,
+          62.576
+        ],
+        [
+          677.143,
+          145.303
+        ]
+      ],
+      "center_point": [
+        707.76,
+        103.94
+      ],
+      "region_id": "region_plains"
+    },
+    {
+      "territory_id": "n14_central_plains",
+      "name": "Central Plains",
+      "geo_polygon": [
+        [
+          -99.35,
+          37.15
+        ],
+        [
+          -96.85,
+          37.15
+        ],
+        [
+          -96.85,
+          40.15
+        ],
+        [
+          -99.35,
+          40.15
+        ],
+        [
+          -99.35,
+          37.15
+        ]
+      ],
+      "polygon": [
+        [
+          677.143,
+          208.939
+        ],
+        [
+          738.367,
+          208.939
+        ],
+        [
+          738.367,
+          145.303
+        ],
+        [
+          677.143,
+          145.303
+        ],
+        [
+          677.143,
+          208.939
+        ]
+      ],
+      "center_point": [
+        707.76,
+        177.12
+      ],
+      "region_id": "region_plains"
+    },
+    {
+      "territory_id": "n14_southern_plains",
+      "name": "Southern Plains",
+      "geo_polygon": [
+        [
+          -99.35,
+          33.45
+        ],
+        [
+          -96.85,
+          33.45
+        ],
+        [
+          -96.85,
+          37.15
+        ],
+        [
+          -99.35,
+          37.15
+        ],
+        [
+          -99.35,
+          33.45
+        ]
+      ],
+      "polygon": [
+        [
+          677.143,
+          287.424
+        ],
+        [
+          738.367,
+          287.424
+        ],
+        [
+          738.367,
+          208.939
+        ],
+        [
+          677.143,
+          208.939
+        ],
+        [
+          677.143,
+          287.424
+        ]
+      ],
+      "center_point": [
+        707.76,
+        248.18
+      ],
+      "region_id": "region_plains"
+    },
+    {
+      "territory_id": "n14_ozark",
+      "name": "Ozark Gateway",
+      "geo_polygon": [
+        [
+          -89.35,
+          35.45
+        ],
+        [
+          -88.85,
+          35.45
+        ],
+        [
+          -88.85,
+          37.15
+        ],
+        [
+          -89.35,
+          37.15
+        ],
+        [
+          -89.35,
+          35.45
+        ]
+      ],
+      "polygon": [
+        [
+          922.041,
+          245
+        ],
+        [
+          934.286,
+          245
+        ],
+        [
+          934.286,
+          208.939
+        ],
+        [
+          922.041,
+          208.939
+        ],
+        [
+          922.041,
+          245
+        ]
+      ],
+      "center_point": [
+        928.16,
+        226.97
+      ],
+      "region_id": "region_plains"
+    },
+    {
+      "territory_id": "n14_chickasaw",
+      "name": "Chickasaw Confederacy",
+      "geo_polygon": [
+        [
+          -89.35,
+          33.05
+        ],
+        [
+          -88.85,
+          33.05
+        ],
+        [
+          -88.85,
+          35.45
+        ],
+        [
+          -89.35,
+          35.45
+        ],
+        [
+          -89.35,
+          33.05
+        ]
+      ],
+      "polygon": [
+        [
+          922.041,
+          295.909
+        ],
+        [
+          934.286,
+          295.909
+        ],
+        [
+          934.286,
+          245
+        ],
+        [
+          922.041,
+          245
+        ],
+        [
+          922.041,
+          295.909
+        ]
+      ],
+      "center_point": [
+        928.16,
+        270.45
+      ],
+      "region_id": "region_chickasaw"
+    },
+    {
+      "territory_id": "n14_apalachee",
+      "name": "Apalachee Chiefdom",
+      "geo_polygon": [
+        [
+          -85.35,
+          29.45
+        ],
+        [
+          -83.6,
+          29.45
+        ],
+        [
+          -83.6,
+          30.2
+        ],
+        [
+          -85.35,
+          30.2
+        ],
+        [
+          -85.35,
+          29.45
+        ]
+      ],
+      "polygon": [
+        [
+          1020,
+          372.273
+        ],
+        [
+          1062.857,
+          372.273
+        ],
+        [
+          1062.857,
+          356.364
+        ],
+        [
+          1020,
+          356.364
+        ],
+        [
+          1020,
+          372.273
+        ]
+      ],
+      "center_point": [
+        1041.43,
+        364.32
+      ],
+      "region_id": "region_florida"
+    },
+    {
+      "territory_id": "n14_timucua",
+      "name": "Timucua Chiefdom",
+      "geo_polygon": [
+        [
+          -83.6,
+          29.45
+        ],
+        [
+          -81.05,
+          29.45
+        ],
+        [
+          -81.05,
+          30.2
+        ],
+        [
+          -83.6,
+          30.2
+        ],
+        [
+          -83.6,
+          29.45
+        ]
+      ],
+      "polygon": [
+        [
+          1062.857,
+          372.273
+        ],
+        [
+          1125.306,
+          372.273
+        ],
+        [
+          1125.306,
+          356.364
+        ],
+        [
+          1062.857,
+          356.364
+        ],
+        [
+          1062.857,
+          372.273
+        ]
+      ],
+      "center_point": [
+        1094.08,
+        364.32
+      ],
+      "region_id": "region_florida"
+    },
+    {
+      "territory_id": "n14_tocobaga",
+      "name": "Tocobaga Chiefdom",
+      "geo_polygon": [
+        [
+          -82.35,
+          27
+        ],
+        [
+          -81.88,
+          27
+        ],
+        [
+          -81.88,
+          28.25
+        ],
+        [
+          -82.35,
+          28.25
+        ],
+        [
+          -82.35,
+          27
+        ]
+      ],
+      "polygon": [
+        [
+          1093.469,
+          424.242
+        ],
+        [
+          1104.98,
+          424.242
+        ],
+        [
+          1104.98,
+          397.727
+        ],
+        [
+          1093.469,
+          397.727
+        ],
+        [
+          1093.469,
+          424.242
+        ]
+      ],
+      "center_point": [
+        1099.22,
+        410.98
+      ],
+      "region_id": "region_florida"
+    },
+    {
+      "territory_id": "n14_calusa",
+      "name": "Calusa Chiefdom",
+      "geo_polygon": [
+        [
+          -82.35,
+          25.55
+        ],
+        [
+          -81.88,
+          25.55
+        ],
+        [
+          -81.88,
+          27
+        ],
+        [
+          -82.35,
+          27
+        ],
+        [
+          -82.35,
+          25.55
+        ]
+      ],
+      "polygon": [
+        [
+          1093.469,
+          455
+        ],
+        [
+          1104.98,
+          455
+        ],
+        [
+          1104.98,
+          424.242
+        ],
+        [
+          1093.469,
+          424.242
+        ],
+        [
+          1093.469,
+          455
+        ]
+      ],
+      "center_point": [
+        1099.22,
+        439.62
+      ],
+      "region_id": "region_florida"
+    },
+    {
+      "territory_id": "n14_ais_tequesta",
+      "name": "Ais-Tequesta Chiefdom",
+      "geo_polygon": [
+        [
+          -80.55,
+          25
+        ],
+        [
+          -79.9,
+          25
+        ],
+        [
+          -79.9,
+          26.25
+        ],
+        [
+          -80.55,
+          26.25
+        ],
+        [
+          -80.55,
+          25
+        ]
+      ],
+      "polygon": [
+        [
+          1137.551,
+          466.667
+        ],
+        [
+          1153.469,
+          466.667
+        ],
+        [
+          1153.469,
+          440.152
+        ],
+        [
+          1137.551,
+          440.152
+        ],
+        [
+          1137.551,
+          466.667
+        ]
+      ],
+      "center_point": [
+        1145.51,
+        453.41
+      ],
+      "region_id": "region_florida"
+    }
+  ],
+  "connections": [
+    {
+      "from": "n14_klamath",
+      "to": "n14_pomo_miwok",
+      "type": "land"
+    },
+    {
+      "from": "n14_pomo_miwok",
+      "to": "n14_chumash",
+      "type": "land"
+    },
+    {
+      "from": "n14_pomo_miwok",
+      "to": "n14_great_valley",
+      "type": "land"
+    },
+    {
+      "from": "n14_chumash",
+      "to": "n14_great_valley",
+      "type": "land"
+    },
+    {
+      "from": "n14_great_valley",
+      "to": "n14_great_basin",
+      "type": "land"
+    },
+    {
+      "from": "n14_great_basin",
+      "to": "n14_dine",
+      "type": "land"
+    },
+    {
+      "from": "n14_dine",
+      "to": "n14_apache_mesa",
+      "type": "land"
+    },
+    {
+      "from": "n14_apache_mesa",
+      "to": "n14_sonoran",
+      "type": "land"
+    },
+    {
+      "from": "n14_sonoran",
+      "to": "n14_wixarika",
+      "type": "land"
+    },
+    {
+      "from": "n14_dine",
+      "to": "n14_northern_plains",
+      "type": "land"
+    },
+    {
+      "from": "n14_wixarika",
+      "to": "n14_collima",
+      "type": "land"
+    },
+    {
+      "from": "n14_collima",
+      "to": "n14_yucu_dzaa",
+      "type": "land"
+    },
+    {
+      "from": "n14_yucu_dzaa",
+      "to": "n14_zaachila",
+      "type": "land"
+    },
+    {
+      "from": "n14_zaachila",
+      "to": "n14_southern_plains",
+      "type": "sea"
+    },
+    {
+      "from": "n14_northern_plains",
+      "to": "n14_central_plains",
+      "type": "land"
+    },
+    {
+      "from": "n14_central_plains",
+      "to": "n14_southern_plains",
+      "type": "land"
+    },
+    {
+      "from": "n14_southern_plains",
+      "to": "n14_ozark",
+      "type": "land"
+    },
+    {
+      "from": "n14_ozark",
+      "to": "n14_chickasaw",
+      "type": "land"
+    },
+    {
+      "from": "n14_central_plains",
+      "to": "n14_ozark",
+      "type": "land"
+    },
+    {
+      "from": "n14_chickasaw",
+      "to": "n14_apalachee",
+      "type": "land"
+    },
+    {
+      "from": "n14_apalachee",
+      "to": "n14_timucua",
+      "type": "land"
+    },
+    {
+      "from": "n14_timucua",
+      "to": "n14_tocobaga",
+      "type": "land"
+    },
+    {
+      "from": "n14_tocobaga",
+      "to": "n14_calusa",
+      "type": "land"
+    },
+    {
+      "from": "n14_calusa",
+      "to": "n14_ais_tequesta",
+      "type": "land"
+    },
+    {
+      "from": "n14_timucua",
+      "to": "n14_calusa",
+      "type": "land"
+    },
+    {
+      "from": "n14_tocobaga",
+      "to": "n14_ais_tequesta",
+      "type": "land"
+    }
+  ],
+  "regions": [
+    {
+      "region_id": "region_california",
+      "name": "Pacific Coast & Central Valley",
+      "bonus": 4
+    },
+    {
+      "region_id": "region_basin",
+      "name": "Great Basin",
+      "bonus": 2
+    },
+    {
+      "region_id": "region_aridoamerica",
+      "name": "Aridoamerica",
+      "bonus": 3
+    },
+    {
+      "region_id": "region_mexico",
+      "name": "Mesoamerica & Mexico",
+      "bonus": 3
+    },
+    {
+      "region_id": "region_plains",
+      "name": "Great Plains & Gateway",
+      "bonus": 4
+    },
+    {
+      "region_id": "region_chickasaw",
+      "name": "Chickasaw Heartland",
+      "bonus": 2
+    },
+    {
+      "region_id": "region_florida",
+      "name": "Florida & Gulf Coast",
+      "bonus": 4
+    }
+  ]
+}

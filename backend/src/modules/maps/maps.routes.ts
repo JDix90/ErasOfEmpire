@@ -123,7 +123,12 @@ export async function mapsRoutes(fastify: FastifyInstance): Promise<void> {
     const limit = 20;
     const skip = (pageNum - 1) * limit;
 
-    const filter: Record<string, unknown> = { is_public: true, moderation_status: 'approved' };
+    // Exclude official built-in era maps (creator system); those are listed under GET /maps/eras.
+    const filter: Record<string, unknown> = {
+      is_public: true,
+      moderation_status: 'approved',
+      creator_id: { $ne: 'system' },
+    };
     if (era) filter.era_theme = era;
 
     let listQuery = CustomMap.find(filter).select(

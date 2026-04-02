@@ -33,6 +33,11 @@ const ERA_MAP_IDS: Record<string, string> = {
   risorgimento: 'era_risorgimento',
 };
 
+/** Community maps launched from Map Hub (map_id → display title). */
+const COMMUNITY_MAP_TITLES: Record<string, string> = {
+  community_14_nations: 'The 14 Nations',
+};
+
 interface PublicGame {
   game_id: string;
   era_id: string;
@@ -67,6 +72,7 @@ const ERA_LABELS: Record<string, string> = {
   modern: 'Modern Day',
   acw: 'American Civil War',
   risorgimento: 'Italian Unification',
+  custom: 'Community map',
 };
 
 function timeAgo(dateStr: string): string {
@@ -92,8 +98,9 @@ export default function LobbyPage() {
   const presetEra = searchParams.get('era');
   const presetMap = searchParams.get('map');
   const eraFromMap = presetMap ? Object.entries(ERA_MAP_IDS).find(([, v]) => v === presetMap)?.[0] : undefined;
-  const resolvedEra = presetEra ?? eraFromMap ?? null;
-  const validEra = ERAS.some((e) => e.id === resolvedEra) ? resolvedEra! : null;
+  const isCommunityMap = !!(presetMap && !Object.values(ERA_MAP_IDS).includes(presetMap));
+  const resolvedEra = isCommunityMap ? null : (presetEra ?? eraFromMap ?? null);
+  const validEra = resolvedEra && ERAS.some((e) => e.id === resolvedEra) ? resolvedEra : null;
   const [showCreate, setShowCreate] = useState(!!validEra || !!presetMap);
   const [lobbyTab, setLobbyTab] = useState<'casual' | 'ranked'>('casual');
 
@@ -105,12 +112,33 @@ export default function LobbyPage() {
 
   // Create game form state
   const [selectedEra, setSelectedEra] = useState(validEra ?? 'ww2');
+  const [selectedCommunityMapId, setSelectedCommunityMapId] = useState<string | null>(
+    isCommunityMap && presetMap ? presetMap : null,
+  );
   const [aiCount, setAiCount] = useState(3);
   const [aiDifficulty, setAiDifficulty] = useState('medium');
   const [fogOfWar, setFogOfWar] = useState(false);
   const [turnTimer, setTurnTimer] = useState(300);
 
   useEffect(() => {
+    const era = searchParams.get('era');
+    const map = searchParams.get('map');
+    if (map) {
+      if (Object.values(ERA_MAP_IDS).includes(map)) {
+        const fromMap = Object.entries(ERA_MAP_IDS).find(([, v]) => v === map)?.[0];
+        if (fromMap) {
+          setSelectedEra(fromMap);
+          setSelectedCommunityMapId(null);
+        }
+      } else {
+        setSelectedCommunityMapId(map);
+      }
+      setShowCreate(true);
+    } else if (era && ERAS.some((e) => e.id === era)) {
+      setSelectedEra(era);
+      setSelectedCommunityMapId(null);
+      setShowCreate(true);
+    }
     if (searchParams.has('era') || searchParams.has('map')) {
       setSearchParams({}, { replace: true });
     }
@@ -209,9 +237,11 @@ export default function LobbyPage() {
     e.preventDefault();
     setCreating(true);
     try {
+      const mapId = selectedCommunityMapId ?? ERA_MAP_IDS[selectedEra];
+      const eraId = selectedCommunityMapId ? 'custom' : selectedEra;
       const res = await api.post('/games', {
-        era_id: selectedEra,
-        map_id: ERA_MAP_IDS[selectedEra],
+        era_id: eraId,
+        map_id: mapId,
         max_players: 8,
         ai_count: aiCount,
         ai_difficulty: aiDifficulty,
@@ -402,14 +432,31 @@ export default function LobbyPage() {
           <div className="card mb-8 animate-fade-in">
             <h3 className="font-display text-xl text-cc-gold mb-6">Configure New Game</h3>
             <form onSubmit={handleCreateGame} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Historical Era</label>
-                <select className="input" value={selectedEra} onChange={(e) => setSelectedEra(e.target.value)}>
-                  {ERAS.map((era) => (
-                    <option key={era.id} value={era.id}>{era.label}</option>
-                  ))}
-                </select>
-              </div>
+              {selectedCommunityMapId ? (
+                <div className="md:col-span-2">
+                  <label className="label">Map</label>
+                  <p className="input bg-cc-dark/50 border-cc-border text-cc-text cursor-default">
+                    {COMMUNITY_MAP_TITLES[selectedCommunityMapId] ?? selectedCommunityMapId}
+                    <span className="text-cc-muted text-sm ml-2">(community)</span>
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="label">Historical Era</label>
+                  <select
+                    className="input"
+                    value={selectedEra}
+                    onChange={(e) => {
+                      setSelectedEra(e.target.value);
+                      setSelectedCommunityMapId(null);
+                    }}
+                  >
+                    {ERAS.map((era) => (
+                      <option key={era.id} value={era.id}>{era.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="label">AI Opponents</label>
                 <select className="input" value={aiCount} onChange={(e) => setAiCount(Number(e.target.value))}>
@@ -451,7 +498,13 @@ export default function LobbyPage() {
                 <button type="submit" className="btn-primary flex-1" disabled={creating}>
                   {creating ? 'Creating...' : 'Create & Enter Lobby'}
                 </button>
-                <button type="button" className="btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => { setShowCreate(false); setSelectedCommunityMapId(null); }}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>

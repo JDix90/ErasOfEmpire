@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../../store/gameStore';
+import { useUiStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { Shield, Sword, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -24,7 +25,8 @@ export default function TerritoryPanel({
   onFortify,
   onClose,
 }: TerritoryPanelProps) {
-  const { gameState, selectedTerritory, attackSource, draftUnitsRemaining, setAttackSource } = useGameStore();
+  const { gameState, draftUnitsRemaining } = useGameStore();
+  const { selectedTerritory, attackSource, setAttackSource } = useUiStore();
   const { user } = useAuthStore();
   const [draftAmount, setDraftAmount] = React.useState(1);
   const [fortifyAmount, setFortifyAmount] = React.useState(1);

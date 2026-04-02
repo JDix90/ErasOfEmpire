@@ -13,6 +13,8 @@ export interface Territory {
   polygon: [number, number][];
   center_point: [number, number];
   region_id: string;
+  /** WGS84 [lng, lat] ring when present; globe uses this instead of projecting canvas polygons. */
+  geo_polygon?: [number, number][];
 }
 
 export interface Connection {
@@ -34,6 +36,16 @@ export interface GameMap {
   era_theme: 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
   canvas_width: number;
   canvas_height: number;
+  /**
+   * Canvas `polygon` coordinates are interpreted in this WGS84 box (same as map JSON authoring).
+   * Required for correct globe fallback when `geo_polygon` is absent; avoids world-spanning distortion.
+   */
+  projection_bounds?: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
   /** Globe: lock idle rotation and frame camera for regional / theater maps */
   globe_view?: {
     lock_rotation?: boolean;
@@ -126,6 +138,13 @@ export const ERA_METADATA: Record<string, {
     color: '#008C45',
     bgColor: '#0f1a14',
     description: 'Risorgimento Italy: Piedmont, the Two Sicilies, Papal States, and Austrian Italy on a peninsula-scale map.',
+  },
+  custom: {
+    label: 'Community map',
+    year: 'Regional',
+    color: '#C9A227',
+    bgColor: '#141a12',
+    description: 'User-created or featured community map.',
   },
 };
 

@@ -11,7 +11,7 @@ const TutorialStartSchema = z.object({
 });
 
 const CreateGameSchema = z.object({
-  era_id: z.enum(['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'acw', 'risorgimento']),
+  era_id: z.enum(['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'acw', 'risorgimento', 'custom']),
   map_id: z.string().min(1).max(128),
   max_players: z.number().int().min(2).max(8),
   settings: z.object({

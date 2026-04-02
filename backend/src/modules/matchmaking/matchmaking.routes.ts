@@ -172,3 +172,10 @@ export function startMatchmakingSweep(): void {
   }, 5000);
   sweepInterval.unref();
 }
+
+export function stopMatchmakingSweep(): void {
+  if (sweepInterval) {
+    clearInterval(sweepInterval);
+    sweepInterval = null;
+  }
+}

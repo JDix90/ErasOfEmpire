@@ -571,6 +571,15 @@ export function initGameSocket(httpServer: HttpServer): Server {
   return io;
 }
 
+/** Clear turn timers and close Socket.IO during graceful shutdown. */
+export function shutdownGameSocket(io: Server): Promise<void> {
+  for (const t of turnTimers.values()) clearTimeout(t);
+  turnTimers.clear();
+  return new Promise((resolve, reject) => {
+    io.close((err) => (err ? reject(err) : resolve()));
+  });
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function broadcastState(io: Server, gameId: string, state: GameState): void {

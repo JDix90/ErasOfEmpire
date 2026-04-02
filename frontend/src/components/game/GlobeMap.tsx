@@ -8,6 +8,7 @@ import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react'
 import Globe, { type GlobeMethods } from 'react-globe.gl';
 import { FastForward } from 'lucide-react';
 import { useGameStore } from '../../store/gameStore';
+import { useUiStore } from '../../store/uiStore';
 import { type TerritoryGeoConfig, type ClipBbox } from '../../data/territoryGeoMapping';
 import {
   buildTerritoryGlobeGeometries,
@@ -27,16 +28,38 @@ const STATES_GEOJSON_URL =
 /** Pre-extracted NE 10m Italy + San Marino + Vatican provinces (built from Natural Earth) */
 const RISORGIMENTO_GEOJSON_URL = '/geo/risorgimento_admin1.json';
 
+/** Nearly opaque fills so adjacent territories do not read as “bleeding” through each other. */
 const PLAYER_COLORS: Record<string, string> = {
-  '#e74c3c': 'rgba(231, 76, 60, 0.82)',
-  '#3498db': 'rgba(52, 152, 219, 0.82)',
-  '#2ecc71': 'rgba(46, 204, 113, 0.82)',
-  '#f39c12': 'rgba(243, 156, 18, 0.82)',
-  '#9b59b6': 'rgba(155, 89, 182, 0.82)',
-  '#1abc9c': 'rgba(26, 188, 156, 0.82)',
-  '#e67e22': 'rgba(230, 126, 34, 0.82)',
-  '#ecf0f1': 'rgba(236, 240, 241, 0.82)',
+  '#e74c3c': 'rgba(231, 76, 60, 0.96)',
+  '#3498db': 'rgba(52, 152, 219, 0.96)',
+  '#2ecc71': 'rgba(46, 204, 113, 0.96)',
+  '#f39c12': 'rgba(243, 156, 18, 0.96)',
+  '#9b59b6': 'rgba(155, 89, 182, 0.96)',
+  '#1abc9c': 'rgba(26, 188, 156, 0.96)',
+  '#e67e22': 'rgba(230, 126, 34, 0.96)',
+  '#ecf0f1': 'rgba(236, 240, 241, 0.96)',
 };
+
+/** Fully opaque caps for regional / locked-camera maps: semi-transparent meshes z-fight at shared borders and blend unpredictably (RGB “shard” noise). */
+const PLAYER_COLORS_SOLID: Record<string, string> = {
+  '#e74c3c': 'rgb(231, 76, 60)',
+  '#3498db': 'rgb(52, 152, 219)',
+  '#2ecc71': 'rgb(46, 204, 113)',
+  '#f39c12': 'rgb(243, 156, 18)',
+  '#9b59b6': 'rgb(155, 89, 182)',
+  '#1abc9c': 'rgb(26, 188, 156)',
+  '#e67e22': 'rgb(230, 126, 34)',
+  '#ecf0f1': 'rgb(236, 240, 241)',
+};
+
+/** Tiny altitude spread so coplanar caps do not z-fight at shared borders (react-globe extrusion). */
+function polygonAltitudeHash(territoryId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < territoryId.length; i++) {
+    h = Math.imul(h ^ territoryId.charCodeAt(i), 16777619);
+  }
+  return ((h >>> 0) % 4096) / 4096;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -71,6 +94,13 @@ interface GameMapData {
   map_id?: string;
   canvas_width?: number;
   canvas_height?: number;
+  /** Matches `projection_bounds` in map JSON — used for canvas→globe when geo_polygon missing */
+  projection_bounds?: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
   /** Optional globe camera: used for regional / single-theater maps */
   globe_view?: GlobeViewConfig;
   territories: MapTerritory[];
@@ -215,7 +245,8 @@ export default function GlobeMap({
   reducedEffects = false,
 }: GlobeMapProps) {
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
-  const { gameState, selectedTerritory, attackSource } = useGameStore();
+  const { gameState } = useGameStore();
+  const { selectedTerritory, attackSource } = useUiStore();
   const [countriesGeo, setCountriesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   const [statesGeo, setStatesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   /** Italy province polygons for era_risorgimento */
@@ -309,6 +340,13 @@ export default function GlobeMap({
     () => deriveRegionalGlobeView(mapData.globe_view, territoryCenters),
     [mapData.globe_view, territoryCenters],
   );
+  /**
+   * Regional / authored-bounds maps: every extruded polygon uses cap + side materials.
+   * Semi-transparent sides (default in three-globe) overlap thousands of faces from neighbors
+   * and sort unpredictably — same RGB “shard” noise as transparent caps. Opaque cap + side fixes it.
+   */
+  const useSolidPlayerCaps =
+    regionalGlobe.lockRotation === true || mapData.projection_bounds != null;
   const regionalGlobeRef = useRef(regionalGlobe);
   regionalGlobeRef.current = regionalGlobe;
 
@@ -387,7 +425,18 @@ export default function GlobeMap({
     );
   }, [regionalGlobe, reducedEffects, globeReadyTick]);
 
-  const polygonExtrusion = regionalGlobe.lockRotation ? 0.005 : 0.008;
+  /** Library default (5°). Lower values increase triangle count; non-default winding + dense caps caused broken WebGL. */
+  const polygonCapCurvatureResolution = 5;
+
+  const getPolygonAltitude = useCallback(
+    (polygon: object) => {
+      const id = (polygon as PolygonData).territory_id;
+      const base = regionalGlobe.lockRotation ? 0.0045 : 0.008;
+      const jitter = regionalGlobe.lockRotation ? polygonAltitudeHash(id) * 0.0012 : 0;
+      return base + jitter;
+    },
+    [regionalGlobe.lockRotation],
+  );
 
   // ── Animation sequences ────────────────────────────────────────────────
 
@@ -839,13 +888,15 @@ export default function GlobeMap({
 
   const getPolygonColor = useCallback((polygon: object) => {
     const p = polygon as PolygonData;
-    if (!gameState) return 'rgba(45, 52, 72, 0.72)';
+    const empty = useSolidPlayerCaps ? 'rgb(45, 52, 72)' : 'rgba(45, 52, 72, 0.92)';
+    if (!gameState) return empty;
     const tState = gameState.territories[p.territory_id];
-    if (!tState?.owner_id) return 'rgba(45, 52, 72, 0.72)';
+    if (!tState?.owner_id) return empty;
     const player = gameState.players.find((ply) => ply.player_id === tState.owner_id);
-    if (!player) return 'rgba(45, 52, 72, 0.72)';
-    return PLAYER_COLORS[player.color] ?? 'rgba(136, 136, 136, 0.82)';
-  }, [gameState]);
+    if (!player) return empty;
+    const table = useSolidPlayerCaps ? PLAYER_COLORS_SOLID : PLAYER_COLORS;
+    return table[player.color] ?? (useSolidPlayerCaps ? 'rgb(136, 136, 136)' : 'rgba(136, 136, 136, 0.92)');
+  }, [gameState, useSolidPlayerCaps]);
 
   const adjacencyTargets = useMemo(() => {
     const set = new Set<string>();
@@ -864,8 +915,13 @@ export default function GlobeMap({
     if (adjacencyTargets.has(p.territory_id)) {
       return gameState?.phase === 'attack' ? '#f87171' : '#4ade80';
     }
-    return '#ffffff';
-  }, [selectedTerritory, attackSource, adjacencyTargets, gameState?.phase]);
+    /** World: dark rim vs ocean. Regional solid-fill: light opaque outline so borders read clearly on player colors. */
+    return useSolidPlayerCaps ? 'rgb(228, 234, 245)' : 'rgba(12, 18, 32, 0.92)';
+  }, [selectedTerritory, attackSource, adjacencyTargets, gameState?.phase, useSolidPlayerCaps]);
+
+  const getPolygonSideColor = useCallback(() => {
+    return useSolidPlayerCaps ? 'rgb(14, 18, 30)' : 'rgba(6, 10, 18, 0.45)';
+  }, [useSolidPlayerCaps]);
 
   // ── Globe layer accessors (stable) ─────────────────────────────────────
 
@@ -938,9 +994,11 @@ export default function GlobeMap({
         polygonsData={polygonsData}
         polygonGeoJsonGeometry="geometry"
         polygonCapColor={getPolygonColor}
-        polygonSideColor={() => 'rgba(0, 0, 0, 0.2)'}
+        polygonSideColor={getPolygonSideColor}
         polygonStrokeColor={getPolygonStroke}
-        polygonAltitude={polygonExtrusion}
+        polygonAltitude={getPolygonAltitude}
+        polygonCapCurvatureResolution={polygonCapCurvatureResolution}
+        polygonsTransitionDuration={0}
         polygonLabel={(p) => (p as PolygonData).name}
         onPolygonClick={(polygon) => polygon && onTerritoryClick((polygon as PolygonData).territory_id)}
 

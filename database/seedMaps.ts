@@ -21,6 +21,7 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(__dirname, '../backend/.env') });
 
 import mongoose from 'mongoose';
+import Redis from 'ioredis';
 
 // ─── Inline the CustomMap schema (mirrors MapModel.ts exactly) ────────────────
 // We inline it here so the seeder can run standalone without importing the full
@@ -32,6 +33,8 @@ const TerritorySchema = new mongoose.Schema({
   polygon:       { type: [[Number]], required: true },
   center_point:  { type: [Number], required: true },
   region_id:     { type: String, required: true },
+  /** WGS84 rings — must match MapModel.ts or Mongoose strips them on seed (globe needs this). */
+  geo_polygon:   { type: [[Number]], default: undefined },
 }, { _id: false });
 
 const ConnectionSchema = new mongoose.Schema({
@@ -53,6 +56,13 @@ const GlobeViewSchema = new mongoose.Schema({
   altitude:      { type: Number },
 }, { _id: false });
 
+const ProjectionBoundsSchema = new mongoose.Schema({
+  minLng: { type: Number, required: true },
+  maxLng: { type: Number, required: true },
+  minLat: { type: Number, required: true },
+  maxLat: { type: Number, required: true },
+}, { _id: false });
+
 const MapSchema = new mongoose.Schema({
   map_id:            { type: String, required: true, unique: true },
   creator_id:        { type: String, required: true, default: 'system' },
@@ -62,6 +72,7 @@ const MapSchema = new mongoose.Schema({
   background_image_url: { type: String, default: '' },
   canvas_width:      { type: Number, default: 1200 },
   canvas_height:     { type: Number, default: 700 },
+  projection_bounds: { type: ProjectionBoundsSchema, required: false },
   globe_view:        { type: GlobeViewSchema, required: false },
   territories:       { type: [TerritorySchema], required: true },
   connections:       { type: [ConnectionSchema], required: true },
@@ -88,6 +99,11 @@ const MAP_FILES = [
   'era_modern.json',
   'era_acw.json',
   'era_risorgimento.json',
+];
+
+/** Community maps: same schema as era JSON, but published under a user id for Map Hub. */
+const COMMUNITY_MAP_FILES: { file: string; creator_id: string }[] = [
+  { file: 'community_14_nations.json', creator_id: 'jmd' },
 ];
 
 const MAPS_DIR = path.resolve(__dirname, 'maps');
@@ -130,6 +146,7 @@ async function seedMaps(): Promise<void> {
       background_image_url: '',
       canvas_width:      data.canvas_width ?? 1200,
       canvas_height:     data.canvas_height ?? 700,
+      projection_bounds: data.projection_bounds ?? undefined,
       globe_view:        data.globe_view ?? undefined,
       territories:       data.territories,
       connections:       data.connections,
@@ -156,6 +173,7 @@ async function seedMaps(): Promise<void> {
               era_theme:         doc.era_theme,
               canvas_width:      doc.canvas_width,
               canvas_height:     doc.canvas_height,
+              projection_bounds: doc.projection_bounds,
               globe_view:        doc.globe_view,
               territories:       doc.territories,
               connections:       doc.connections,
@@ -179,6 +197,78 @@ async function seedMaps(): Promise<void> {
     }
   }
 
+  for (const { file: filename, creator_id } of COMMUNITY_MAP_FILES) {
+    const filepath = path.join(MAPS_DIR, filename);
+
+    if (!fs.existsSync(filepath)) {
+      console.warn(`  ⚠ Community map not found, skipping: ${filename}`);
+      skipped++;
+      continue;
+    }
+
+    const raw  = fs.readFileSync(filepath, 'utf-8');
+    const data = JSON.parse(raw);
+
+    const doc = {
+      map_id:            data.map_id,
+      creator_id,
+      name:              data.name,
+      description:       data.description || '',
+      era_theme:         data.era_theme   || '',
+      background_image_url: '',
+      canvas_width:      data.canvas_width ?? 1200,
+      canvas_height:     data.canvas_height ?? 700,
+      projection_bounds: data.projection_bounds ?? undefined,
+      globe_view:        data.globe_view ?? undefined,
+      territories:       data.territories,
+      connections:       data.connections,
+      regions:           data.regions,
+      is_public:         true,
+      is_moderated:      true,
+      moderation_status: 'approved' as 'approved',
+      rating:            0,
+      rating_count:      0,
+      play_count:        0,
+    };
+
+    try {
+      const existing = await SeederMap.findOne({ map_id: doc.map_id });
+
+      if (existing) {
+        await SeederMap.updateOne(
+          { map_id: doc.map_id },
+          {
+            $set: {
+              creator_id,
+              name:              doc.name,
+              description:       doc.description,
+              era_theme:         doc.era_theme,
+              canvas_width:      doc.canvas_width,
+              canvas_height:     doc.canvas_height,
+              projection_bounds: doc.projection_bounds,
+              globe_view:        doc.globe_view,
+              territories:       doc.territories,
+              connections:       doc.connections,
+              regions:           doc.regions,
+              is_public:         true,
+              is_moderated:      true,
+              moderation_status: 'approved',
+            }
+          }
+        );
+        console.log(`  ↻ UPDATED (community):  ${doc.name} [${creator_id}]`);
+        updated++;
+      } else {
+        await SeederMap.create(doc);
+        console.log(`  ✓ INSERTED (community): ${doc.name} [${creator_id}]`);
+        console.log(`    ${doc.territories.length} territories · ${doc.connections.length} connections · ${doc.regions.length} regions`);
+        inserted++;
+      }
+    } catch (err: any) {
+      console.error(`  ✗ ERROR seeding community ${filename}: ${err.message}`);
+    }
+  }
+
   console.log('\n' + '─'.repeat(60));
   console.log(`Seeding complete:`);
   console.log(`  Inserted : ${inserted}`);
@@ -198,6 +288,21 @@ async function seedMaps(): Promise<void> {
   }
 
   console.log('\n✅ Done.');
+
+  // Drop stale Redis map payloads (e.g. missing geo_polygon / projection_bounds after schema fixes).
+  try {
+    const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+    const redis = new Redis(redisUrl);
+    const allMaps = await SeederMap.find({}, 'map_id').lean();
+    for (const m of allMaps as { map_id: string }[]) {
+      await redis.del(`map:${m.map_id}`);
+    }
+    await redis.quit();
+    console.log(`  ✓ Cleared Redis map:* cache (${allMaps.length} keys)`);
+  } catch {
+    console.warn('  ⚠ Redis cache clear skipped (is Redis running?)');
+  }
+
   await mongoose.disconnect();
 }
 

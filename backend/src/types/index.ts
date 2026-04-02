@@ -2,12 +2,14 @@
 // Shared backend types for ChronoConquest
 // ============================================================
 
-export type EraId = 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento';
+import type { GamePhase, ConnectionType, MapConnectionEdge } from '@chronoconquest/shared';
+
+export type { GamePhase, ConnectionType, MapConnectionEdge };
+
+export type EraId = 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
 export type GameStatus = 'waiting' | 'in_progress' | 'completed' | 'abandoned';
-export type GamePhase = 'draft' | 'attack' | 'fortify' | 'game_over';
 export type VictoryType = 'domination' | 'secret_mission' | 'capital' | 'threshold';
 export type AiDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'tutorial';
-export type ConnectionType = 'land' | 'sea';
 export type DiplomacyStatus = 'neutral' | 'truce' | 'nap' | 'war';
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -138,6 +140,8 @@ export interface MapTerritory {
   polygon: number[][];
   center_point: [number, number];
   region_id: string;
+  /** Closed ring in WGS84 [lng, lat] — used by globe when set (avoids warped canvas→globe mapping). */
+  geo_polygon?: [number, number][];
   /** ISO_A2 country codes for geographic boundaries */
   iso_codes?: string[];
   /** Clip merged geometry to [minLng, minLat, maxLng, maxLat] */

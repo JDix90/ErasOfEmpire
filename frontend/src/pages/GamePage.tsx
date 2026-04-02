@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useGameStore, CombatResult } from '../store/gameStore';
+import { useUiStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
 import { connectSocket, getSocket } from '../services/socket';
 import { api } from '../services/api';
@@ -24,6 +25,12 @@ interface MapData {
   name: string;
   canvas_width?: number;
   canvas_height?: number;
+  projection_bounds?: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
   globe_view?: {
     lock_rotation?: boolean;
     center_lat?: number;
@@ -36,6 +43,7 @@ interface MapData {
     polygon: number[][];
     center_point: [number, number];
     region_id: string;
+    geo_polygon?: [number, number][];
   }>;
   connections: Array<{ from: string; to: string; type: 'land' | 'sea' }>;
   regions: Array<{ region_id: string; name: string; bonus: number }>;
@@ -46,10 +54,12 @@ export default function GamePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const {
-    gameState, setGameState, setSelectedTerritory, setLastCombatResult,
-    selectedTerritory, attackSource, setAttackSource, draftUnitsRemaining,
-    setDraftUnitsRemaining, clearGame,
+    gameState, setGameState, setLastCombatResult,
+    draftUnitsRemaining, setDraftUnitsRemaining, clearGame,
   } = useGameStore();
+  const {
+    selectedTerritory, attackSource, setSelectedTerritory, setAttackSource,
+  } = useUiStore();
 
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [combatLog, setCombatLog] = useState<string[]>([]);
@@ -97,6 +107,7 @@ export default function GamePage() {
   tutorialStepRef.current = tutorialStep;
   /** Increments when player completes an attack during attack_do — triggers auto phase advance */
   const [tutorialAttackAutoTick, setTutorialAttackAutoTick] = useState(0);
+  const [socketConnection, setSocketConnection] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
 
   const pushModal = useCallback((data: ModalData) => {
     setModalQueue(prev => [...prev, data]);
@@ -118,7 +129,25 @@ export default function GamePage() {
     connectSocket();
     const socket = getSocket();
 
-    socket.emit('game:join', { gameId });
+    const joinGame = () => {
+      socket.emit('game:join', { gameId });
+    };
+
+    joinGame();
+
+    const onConnect = () => {
+      setSocketConnection('connected');
+      joinGame();
+    };
+    const onDisconnect = () => setSocketConnection('disconnected');
+    const onReconnectAttempt = () => setSocketConnection('reconnecting');
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.io.on('reconnect_attempt', onReconnectAttempt);
+    if (socket.connected) {
+      setSocketConnection('connected');
+    }
 
     socket.on('game:joined', ({ playerIndex }: { playerIndex: number }) => {
       setIsHost(playerIndex === 0);
@@ -385,6 +414,9 @@ export default function GamePage() {
     });
 
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.io.off('reconnect_attempt', onReconnectAttempt);
       socket.off('game:joined');
       socket.off('game:state');
       socket.off('game:started');
@@ -710,7 +742,9 @@ export default function GamePage() {
       <div className="min-h-10 pt-safe bg-cc-surface border-b border-cc-border flex items-center px-4 gap-4 shrink-0 py-1">
         <Link to="/lobby" className="font-display text-cc-gold text-sm tracking-widest hover:text-white transition-colors">CHRONOCONQUEST</Link>
         <span className="text-cc-muted text-xs">·</span>
-        <span className="text-cc-muted text-xs capitalize">{gameState.era} Era</span>
+        <span className="text-cc-muted text-xs capitalize">
+          {gameState.era === 'custom' ? 'Community map' : `${gameState.era} Era`}
+        </span>
         <span className="text-cc-muted text-xs">·</span>
         <span className="text-cc-muted text-xs">Turn {gameState.turn_number}</span>
         <div className="flex-1" />
@@ -737,6 +771,21 @@ export default function GamePage() {
           </button>
         </div>
       </div>
+
+      {socketConnection !== 'connected' && (
+        <div
+          role="status"
+          className={`shrink-0 px-4 py-2 text-center text-sm ${
+            socketConnection === 'reconnecting'
+              ? 'bg-amber-900/40 text-amber-200 border-b border-amber-700/50'
+              : 'bg-red-900/40 text-red-200 border-b border-red-700/50'
+          }`}
+        >
+          {socketConnection === 'reconnecting'
+            ? 'Reconnecting to game server…'
+            : 'Disconnected from game server. Attempting to reconnect…'}
+        </div>
+      )}
 
       {/* Main Game Area */}
       <div className="flex flex-1 overflow-hidden">
