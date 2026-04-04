@@ -258,7 +258,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-cc-dark">
       {/* Navigation */}
       <nav className="border-b border-cc-border px-6 py-4 flex items-center justify-between pt-safe px-safe">
-        <Link to="/" className="font-display text-2xl text-cc-gold tracking-widest hover:text-white transition-colors">CHRONOCONQUEST</Link>
+        <Link to="/" className="font-display text-2xl text-cc-gold tracking-widest hover:text-white transition-colors">ERAS OF EMPIRE</Link>
         <div className="flex gap-3">
           <Link to="/login" className="btn-secondary text-sm">Sign In</Link>
           <Link to="/register" className="btn-primary text-sm">Play Free</Link>
@@ -319,7 +319,7 @@ export default function LandingPage() {
 
       {/* Features */}
       <section className="py-16 px-6 max-w-6xl mx-auto">
-        <h3 className="font-display text-3xl text-center text-cc-gold mb-10">Why ChronoConquest?</h3>
+        <h3 className="font-display text-3xl text-center text-cc-gold mb-10">Why Eras of Empire?</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {FEATURES.map((f) => (
             <div key={f.title} className="card flex gap-4">
@@ -344,7 +344,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-cc-border py-8 pb-safe text-center text-cc-muted text-sm space-y-2">
-        <p>© 2026 ChronoConquest. All rights reserved.</p>
+        <p>© 2026 Eras of Empire. All rights reserved.</p>
         <Link to="/privacy" className="text-cc-gold/80 hover:text-cc-gold block">Privacy Policy</Link>
       </footer>
     </div>

@@ -15,7 +15,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'welcome',
     title: 'Welcome, Commander!',
-    message: 'This quick tutorial teaches you the core mechanics of ChronoConquest. Each turn has three phases: Draft, Attack, and Fortify.',
+    message: 'This quick tutorial teaches you the core mechanics of Eras of Empire. Each turn has three phases: Draft, Attack, and Fortify.',
     hint: 'Click "Next" to continue.',
   },
   {

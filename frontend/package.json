@@ -1,5 +1,5 @@
 {
-  "name": "chronoconquest-frontend",
+  "name": "erasofempire-frontend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "cap:android": "npx cap open android"
   },
   "dependencies": {
-    "@chronoconquest/shared": "workspace:*",
+    "@erasofempire/shared": "workspace:*",
     "@pixi/react": "^7.1.2",
     "@turf/bbox-polygon": "^7.3.4",
     "@turf/boolean-intersects": "^7.3.4",

@@ -1,4 +1,4 @@
-# ChronoConquest
+# Eras of Empire
 
 > A browser-based historical world map strategy game inspired by Risk — featuring five playable eras, a custom map editor, real-time multiplayer, AI opponents, and a full JWT authentication system.
 
@@ -24,7 +24,7 @@
 
 ## Project Overview
 
-ChronoConquest is a full-stack web application where players command armies across historically accurate maps spanning five eras:
+Eras of Empire is a full-stack web application where players command armies across historically accurate maps spanning five eras:
 
 | Era | Period | Key Feature |
 |---|---|---|
@@ -61,7 +61,7 @@ Players draft reinforcements, attack adjacent territories, and fortify positions
 ## Project Structure
 
 ```
-chronoconquest/
+eras-of-empire/
 ├── README.md
 ├── package.json                  # Root monorepo workspace
 ├── .gitignore
@@ -154,7 +154,7 @@ chronoconquest/
 
 ## Prerequisites
 
-Before running ChronoConquest locally, ensure the following are installed:
+Before running Eras of Empire locally, ensure the following are installed:
 
 | Tool | Version | Install |
 |---|---|---|
@@ -264,7 +264,7 @@ pnpm run dev
 The backend starts on **http://localhost:3001**. You should see:
 
 ```
-🚀 ChronoConquest backend running on http://localhost:3001
+🚀 Eras of Empire backend running on http://localhost:3001
    Environment: development
    Frontend URL: http://localhost:5173
 ```
@@ -293,7 +293,7 @@ The frontend starts on **http://localhost:5173**. Open this URL in your browser.
 | `FRONTEND_URL` | `http://localhost:5173` | CORS allowed origin |
 | `POSTGRES_HOST` | `localhost` | PostgreSQL host |
 | `POSTGRES_PORT` | `5432` | PostgreSQL port |
-| `POSTGRES_DB` | `chronoconquest` | Database name |
+| `POSTGRES_DB` | `erasofempire` | Database name |
 | `POSTGRES_USER` | `chronouser` | Database user |
 | `POSTGRES_PASSWORD` | `chronopass` | Database password |
 | `MONGO_URI` | `mongodb://...` | MongoDB connection string |
@@ -338,6 +338,14 @@ The migration creates the following tables:
 |---|---|
 | `leaderboard:{era}` | Sorted set of MMR scores per era |
 | `session:{userId}` | Active session metadata |
+
+### Migrating from legacy chronoconquest database names
+
+Older setups used PostgreSQL database `chronoconquest` and MongoDB `chronoconquest_maps`. Defaults now use `erasofempire` and `erasofempire_maps`.
+
+- **Keep existing data without moving files:** In `backend/.env`, `.env.production`, and Docker env, set `POSTGRES_DB=chronoconquest` and point `MONGO_URI` at `.../chronoconquest_maps?...` so the app connects to your existing databases.
+- **Move to the new names:** Use `pg_dump` / `pg_restore` into `erasofempire`, and `mongodump` / `mongorestore` into `erasofempire_maps`, then update env vars. Docker-only: you can also start fresh volumes with the new names (loses old data unless you dump first).
+- **Container renames:** Compose `container_name` values were updated for consistency; data stays in named volumes. After changing env, run `docker compose down` / `up` as needed.
 
 ---
 
@@ -551,4 +559,4 @@ This project is proprietary. All rights reserved.
 
 ---
 
-*Built with ChronoConquest v1.0.0 — March 2026*
+*Built with Eras of Empire v1.0.0 — March 2026*

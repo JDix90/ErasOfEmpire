@@ -1,5 +1,5 @@
 """
-ChronoConquest — Medieval Era Map (circa 1200 AD)
+Eras of Empire — Medieval Era Map (circa 1200 AD)
 Canvas: 1200 x 700 px
 Major powers: Mongol Empire, Holy Roman Empire, Byzantine Empire,
               Abbasid Caliphate, Song China, Mali Empire, Crusader States

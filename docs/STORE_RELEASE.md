@@ -1,6 +1,6 @@
 # Store release checklist (template)
 
-Use this when submitting ChronoConquest to Apple App Store and Google Play. Adjust for your legal entity and hosting.
+Use this when submitting Eras of Empire to Apple App Store and Google Play. Adjust for your legal entity and hosting.
 
 ## Before submission
 
@@ -15,7 +15,7 @@ Use this when submitting ChronoConquest to Apple App Store and Google Play. Adju
 ## Apple App Store
 
 - [ ] Apple Developer Program enrollment
-- [ ] App Store Connect: new app, bundle ID matches `com.chronoconquest.app` (or change in `capacitor.config.ts`)
+- [ ] App Store Connect: display name **Eras of Empire**; bundle ID `com.chronoconquest.app` kept for continuity (changing `appId` creates a new store app)
 - [ ] Privacy nutrition labels (data collected: account, gameplay, identifiers if any)
 - [ ] Age rating (strategy / mild combat)
 - [ ] Screenshots for required device sizes

@@ -14,7 +14,7 @@ importers:
 
   backend:
     dependencies:
-      '@chronoconquest/shared':
+      '@erasofempire/shared':
         specifier: workspace:*
         version: link:../packages/shared
       '@fastify/cookie':
@@ -96,7 +96,7 @@ importers:
 
   frontend:
     dependencies:
-      '@chronoconquest/shared':
+      '@erasofempire/shared':
         specifier: workspace:*
         version: link:../packages/shared
       '@pixi/react':

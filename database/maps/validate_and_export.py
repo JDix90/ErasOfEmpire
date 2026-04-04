@@ -1,5 +1,5 @@
 """
-ChronoConquest — Map Validation & JSON Export
+Eras of Empire — Map Validation & JSON Export
 Validates all 6 era maps and exports them to JSON files.
 """
 
@@ -95,7 +95,7 @@ def validate_map(m):
 
 
 print("=" * 60)
-print("ChronoConquest — Map Validation Report")
+print("Eras of Empire — Map Validation Report")
 print("=" * 60)
 
 for m in ALL_MAPS:

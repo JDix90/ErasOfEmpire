@@ -95,7 +95,7 @@ async function bootstrap(): Promise<void> {
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
 
-  console.log(`\n🚀 ChronoConquest backend running on http://localhost:${config.port}`);
+  console.log(`\n🚀 Eras of Empire backend running on http://localhost:${config.port}`);
   console.log(`   Environment: ${config.nodeEnv}`);
   console.log(`   CORS origins: ${config.corsOrigins.join(', ')}\n`);
 

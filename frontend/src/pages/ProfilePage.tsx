@@ -166,7 +166,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-cc-dark">
       <nav className="border-b border-cc-border px-6 py-4 flex items-center gap-4 pt-safe px-safe">
         <Link to="/lobby" className="font-display text-xl text-cc-gold tracking-widest hover:text-white transition-colors">
-          CHRONOCONQUEST
+          ERAS OF EMPIRE
         </Link>
         <span className="text-cc-border">|</span>
         <h1 className="font-display text-lg text-cc-muted">Commander Profile</h1>

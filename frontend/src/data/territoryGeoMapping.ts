@@ -1,5 +1,5 @@
 /**
- * Maps ChronoConquest territory IDs to GeoJSON country codes and optional clip regions.
+ * Maps Eras of Empire territory IDs to GeoJSON country codes and optional clip regions.
  * Used by GlobeMap to render real geographic boundaries.
  *
  * Resolution order:

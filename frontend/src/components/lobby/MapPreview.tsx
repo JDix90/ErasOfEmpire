@@ -1,5 +1,5 @@
 /**
- * ChronoConquest — Map Preview Component
+ * Eras of Empire — Map Preview Component
  * Renders a compact SVG preview of a game map showing territories
  * colored by region, with hover tooltips.
  */

@@ -94,6 +94,7 @@ function computeLandConnections(
     countriesGeo: inputs.countriesGeo,
     statesGeo: inputs.statesGeo,
     risorgimentoGeo: needsRis ? inputs.risorgimentoGeo : { type: 'FeatureCollection', features: [] },
+    admin50Geo: null,
   });
 
   const land = new Set<string>();

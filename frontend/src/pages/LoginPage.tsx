@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="min-h-screen-safe bg-cc-dark flex items-center justify-center px-4 pt-safe pb-safe">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="font-display text-3xl text-cc-gold tracking-widest">CHRONOCONQUEST</Link>
+          <Link to="/" className="font-display text-3xl text-cc-gold tracking-widest">ERAS OF EMPIRE</Link>
           <p className="text-cc-muted mt-2">Sign in to your account</p>
         </div>
 

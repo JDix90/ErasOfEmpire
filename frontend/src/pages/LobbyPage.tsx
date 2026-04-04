@@ -281,7 +281,7 @@ export default function LobbyPage() {
       {/* Top Bar */}
       <nav className="border-b border-cc-border px-4 sm:px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-safe px-safe">
         <Link to="/lobby" className="font-display text-xl text-cc-gold tracking-widest hover:text-white transition-colors shrink-0">
-          CHRONOCONQUEST
+          ERAS OF EMPIRE
         </Link>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 justify-end">
           <Link to="/maps" className="flex items-center gap-1.5 text-cc-muted hover:text-cc-text text-sm transition-colors">

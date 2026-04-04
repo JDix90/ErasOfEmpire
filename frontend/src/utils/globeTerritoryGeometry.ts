@@ -14,12 +14,12 @@ import {
   TERRITORY_GEO_CONFIG,
   TERRITORY_ISO_MAP,
   type TerritoryGeoConfig,
-  type ClipBbox,
 } from '../data/territoryGeoMapping';
 import { ACW_TERRITORY_STATES } from '../data/acwStateMap';
 import { RISORGIMENTO_TERRITORY_PARTS } from '../data/risorgimentoRegionMap';
-import { clipToBbox } from './geoClip';
+import { clipToBbox, type ClipBbox } from './geoClip';
 import { unionGeoJsonGeometries } from './geoUnion';
+import { COMMUNITY_14N_TERRITORY_GEO } from '../data/community14nAdmin1Map';
 
 /** Minimal territory shape for geometry building (matches GameMap + GlobeMap props). */
 export interface GlobeTerritoryInput {
@@ -105,6 +105,25 @@ function centerPlaceholderGeometry(
   };
 }
 
+function getCountryClippedToBbox(
+  iso2: string,
+  bbox: ClipBbox,
+  isoToFeatures: Map<string, GeoJSON.Feature[]>,
+): GeoJSON.Polygon | GeoJSON.MultiPolygon | null {
+  const feats = isoToFeatures.get(iso2);
+  if (!feats?.length) return null;
+  const geoms: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[] = [];
+  for (const f of feats) {
+    const g = f.geometry;
+    if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon')) {
+      geoms.push(g as GeoJSON.Polygon | GeoJSON.MultiPolygon);
+    }
+  }
+  if (geoms.length === 0) return null;
+  const merged = geoms.length === 1 ? geoms[0] : mergeGeometries(geoms);
+  return clipToBbox(merged, bbox);
+}
+
 function mergeGeometries(geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[]): GeoJSON.MultiPolygon {
   const polygons: GeoJSON.Position[][][] = [];
   for (const geom of geometries) {
@@ -115,6 +134,35 @@ function mergeGeometries(geometries: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[])
     }
   }
   return { type: 'MultiPolygon', coordinates: polygons };
+}
+
+/** Remove consecutive duplicate vertices (and a closing duplicate) so earcut/triangulation stays stable. */
+function sanitizeClosedExteriorRing(ring: GeoJSON.Position[]): GeoJSON.Position[] {
+  const eps = 1e-9;
+  const deduped: GeoJSON.Position[] = [];
+  for (const p of ring) {
+    const x = Number(p[0]);
+    const y = Number(p[1]);
+    const prev = deduped[deduped.length - 1];
+    if (
+      !prev ||
+      Math.abs(Number(prev[0]) - x) > eps ||
+      Math.abs(Number(prev[1]) - y) > eps
+    ) {
+      deduped.push([x, y]);
+    }
+  }
+  if (deduped.length < 3) return ring;
+  const f = deduped[0];
+  const l = deduped[deduped.length - 1];
+  if (
+    Math.abs(Number(f[0]) - Number(l[0])) < eps &&
+    Math.abs(Number(f[1]) - Number(l[1])) < eps
+  ) {
+    deduped.pop();
+  }
+  if (deduped.length < 3) return ring;
+  return [...deduped, deduped[0]];
 }
 
 /**
@@ -142,21 +190,27 @@ function ringToPolygonGeometry(ringInput: [number, number][]): GeoJSON.Polygon {
     const feat = turfPolygon([closed]);
     const rewound = rewind(feat) as GeoJSON.Feature<GeoJSON.Polygon>;
     if (rewound.geometry?.type === 'Polygon') {
-      return rewound.geometry;
+      const coords = rewound.geometry.coordinates.map((r, i) =>
+        i === 0 ? sanitizeClosedExteriorRing(r) : r,
+      );
+      return { type: 'Polygon', coordinates: coords };
     }
   } catch {
     /* fall through */
   }
-  return { type: 'Polygon', coordinates: [closed] };
+  return { type: 'Polygon', coordinates: [sanitizeClosedExteriorRing(closed)] };
 }
 
 export interface GlobeGeometryInputs {
   countriesGeo: GeoJSON.FeatureCollection | null;
   statesGeo: GeoJSON.FeatureCollection | null;
   risorgimentoGeo: GeoJSON.FeatureCollection | null;
+  /** ne_50m admin-1 — Canadian provinces for community_14_nations */
+  admin50Geo?: GeoJSON.FeatureCollection | null;
 }
 
 export interface GlobeMapDataForGeometry {
+  map_id?: string;
   canvas_width?: number;
   canvas_height?: number;
   /** When set, canvas `polygon` coords map through these bounds (same as JSON `projection_bounds`). */
@@ -169,7 +223,7 @@ export interface GlobeMapDataForGeometry {
  */
 export function buildTerritoryGlobeGeometries(
   mapData: GlobeMapDataForGeometry,
-  { countriesGeo, statesGeo, risorgimentoGeo }: GlobeGeometryInputs,
+  { countriesGeo, statesGeo, risorgimentoGeo, admin50Geo = null }: GlobeGeometryInputs,
 ): PolygonData[] {
   const canvasW = mapData.canvas_width ?? 1200;
   const canvasH = mapData.canvas_height ?? 700;
@@ -218,10 +272,67 @@ export function buildTerritoryGlobeGeometries(
     }
   }
 
+  const usIso3166ToGeom = new Map<string, GeoJSON.Polygon | GeoJSON.MultiPolygon>();
+  if (statesGeo?.features) {
+    for (const f of statesGeo.features) {
+      const code = f.properties?.iso_3166_2;
+      if (typeof code !== 'string' || !code.startsWith('US-')) continue;
+      const g = f.geometry;
+      if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon')) {
+        usIso3166ToGeom.set(code, g as GeoJSON.Polygon | GeoJSON.MultiPolygon);
+      }
+    }
+  }
+
+  const admin50Iso3166ToGeom = new Map<string, GeoJSON.Polygon | GeoJSON.MultiPolygon>();
+  if (admin50Geo?.features) {
+    for (const f of admin50Geo.features) {
+      const code = f.properties?.iso_3166_2;
+      if (typeof code !== 'string') continue;
+      const g = f.geometry;
+      if (g && (g.type === 'Polygon' || g.type === 'MultiPolygon')) {
+        admin50Iso3166ToGeom.set(code, g as GeoJSON.Polygon | GeoJSON.MultiPolygon);
+      }
+    }
+  }
+
   return mapData.territories.map((raw) => {
     const territory = raw as TerritoryRow;
 
-    // Explicit map-authored rings always win (community maps, editor drawings).
+    /** Community "14 Nations": Natural Earth admin-1 union + clip (same idea as Risorgimento / era maps). */
+    const c14 = COMMUNITY_14N_TERRITORY_GEO[territory.territory_id];
+    if (
+      mapData.map_id === 'community_14_nations' &&
+      c14 &&
+      countriesGeo &&
+      statesGeo &&
+      isoToFeatures.size > 0
+    ) {
+      const geoms: (GeoJSON.Polygon | GeoJSON.MultiPolygon)[] = [];
+      for (const code of c14.admin1) {
+        const g = usIso3166ToGeom.get(code) ?? admin50Iso3166ToGeom.get(code);
+        if (g) geoms.push(g);
+      }
+      if (c14.fill_country_iso === 'MX') {
+        const mx = getCountryClippedToBbox('MX', c14.clip_bbox, isoToFeatures);
+        if (mx) geoms.push(mx);
+      }
+      if (geoms.length > 0) {
+        const merged =
+          geoms.length === 1 ? geoms[0] : unionGeoJsonGeometries(geoms);
+        if (merged) {
+          const clipped = clipToBbox(merged, c14.clip_bbox);
+          const finalGeom = clipped ?? merged;
+          return {
+            territory_id: territory.territory_id,
+            name: territory.name,
+            geometry: finalGeom,
+          };
+        }
+      }
+    }
+
+    // Explicit map-authored rings (editor drawings). Skipped for community_14_nations when NE path above wins.
     if (territory.geo_polygon && territory.geo_polygon.length >= 3) {
       const ring: [number, number][] = [...territory.geo_polygon];
       if (

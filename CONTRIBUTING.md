@@ -1,4 +1,4 @@
-# Contributing to ChronoConquest
+# Contributing to Eras of Empire
 
 ## Workflow
 
@@ -14,4 +14,4 @@
 
 ## Shared types
 
-Domain types shared between frontend and backend live in `packages/shared` (`@chronoconquest/shared`). Prefer adding new cross-boundary types there instead of duplicating.
+Domain types shared between frontend and backend live in `packages/shared` (`@erasofempire/shared`). Prefer adding new cross-boundary types there instead of duplicating.

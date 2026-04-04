@@ -1,4 +1,4 @@
-# ChronoConquest — Capacitor mobile workflow
+# Eras of Empire — Capacitor mobile workflow
 
 The web client lives in `frontend/`. Capacitor wraps the Vite `dist/` output as iOS and Android apps.
 

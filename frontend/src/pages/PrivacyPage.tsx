@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen-safe bg-cc-dark pt-safe pb-safe px-safe">
       <nav className="border-b border-cc-border px-6 py-4">
         <Link to="/" className="font-display text-xl text-cc-gold tracking-widest hover:text-white transition-colors">
-          CHRONOCONQUEST
+          ERAS OF EMPIRE
         </Link>
       </nav>
       <article className="max-w-2xl mx-auto px-6 py-10 text-cc-text space-y-6">

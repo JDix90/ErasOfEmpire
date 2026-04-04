@@ -1,5 +1,5 @@
 /**
- * ChronoConquest — Era Selector Component
+ * Eras of Empire — Era Selector Component
  * Displays built-in historical era maps as selectable cards.
  * Fetches live territory counts and descriptions from the API.
  */

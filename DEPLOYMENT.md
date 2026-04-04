@@ -1,4 +1,4 @@
-# Deploying ChronoConquest for friends (web)
+# Deploying Eras of Empire for friends (web)
 
 This document implements the **staged release** plan: host the app on the internet so others can open a link, and keep it running without your Mac.
 
@@ -84,6 +84,10 @@ If the SPA is on a different origin than the API:
 1. Build the frontend with `VITE_API_URL` and `VITE_SOCKET_URL` pointing at the API origin (see [frontend/src/config/env.ts](frontend/src/config/env.ts)).
 2. Set **`CORS_ORIGINS`** on the backend to include the static site origin.
 3. If cookies must cross sites, review **`REFRESH_COOKIE_SAME_SITE`** and secure cookie settings.
+
+## Database names (rebrand)
+
+Default Postgres DB and Mongo database segment are now `erasofempire` / `erasofempire_maps`. If you already run production on the old `chronoconquest` names, either keep those values in env (no data move) or migrate with `pg_dump` / `mongodump` as described in [README.md — Migrating from legacy chronoconquest database names](README.md#migrating-from-legacy-chronoconquest-database-names).
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
-# Agent instructions (ChronoConquest)
+# Agent instructions (Eras of Empire)
 
-This repo is **ChronoConquest**: a browser-based historical Risk-style game — React + Vite + TypeScript frontend (PixiJS 2D map, react-globe.gl globe, Zustand), **Fastify** + **Socket.io** backend, **PostgreSQL** (Drizzle) for users/games/snapshots, **MongoDB** for map documents, **Redis**, **JWT** access/refresh. Gameplay is **server-authoritative**; live state is **in memory** with **Postgres snapshots**.
+This repo is **Eras of Empire**: a browser-based historical Risk-style game — React + Vite + TypeScript frontend (PixiJS 2D map, react-globe.gl globe, Zustand), **Fastify** + **Socket.io** backend, **PostgreSQL** (Drizzle) for users/games/snapshots, **MongoDB** for map documents, **Redis**, **JWT** access/refresh. Gameplay is **server-authoritative**; live state is **in memory** with **Postgres snapshots**.
 
 ## Where to read first
 

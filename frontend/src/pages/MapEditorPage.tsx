@@ -260,7 +260,7 @@ export default function MapEditorPage() {
       {/* Top Bar */}
       <div className="min-h-12 pt-safe bg-cc-surface border-b border-cc-border flex items-center px-4 gap-4 shrink-0 py-1">
         <RouterLink to="/lobby" className="font-display text-cc-gold text-sm tracking-widest hover:text-white transition-colors">
-          CHRONOCONQUEST
+          ERAS OF EMPIRE
         </RouterLink>
         <span className="text-cc-border">|</span>
         <input

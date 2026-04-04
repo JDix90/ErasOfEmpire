@@ -1,4 +1,4 @@
-# Map Creation Guide — ChronoConquest
+# Map Creation Guide — Eras of Empire
 
 ## Geographic boundaries on the globe
 

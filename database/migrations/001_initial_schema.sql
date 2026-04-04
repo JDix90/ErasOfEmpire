@@ -1,4 +1,4 @@
--- ChronoConquest Initial Database Schema
+-- Eras of Empire Initial Database Schema
 -- Migration 001: Core tables
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

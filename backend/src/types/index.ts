@@ -1,8 +1,8 @@
 // ============================================================
-// Shared backend types for ChronoConquest
+// Shared backend types for Eras of Empire
 // ============================================================
 
-import type { GamePhase, ConnectionType, MapConnectionEdge } from '@chronoconquest/shared';
+import type { GamePhase, ConnectionType, MapConnectionEdge } from '@erasofempire/shared';
 
 export type { GamePhase, ConnectionType, MapConnectionEdge };
 
@@ -169,4 +169,18 @@ export interface GameMap {
   territories: MapTerritory[];
   connections: MapConnection[];
   regions: MapRegion[];
+  canvas_width?: number;
+  canvas_height?: number;
+  projection_bounds?: {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+  };
+  globe_view?: {
+    lock_rotation?: boolean;
+    center_lat?: number;
+    center_lng?: number;
+    altitude?: number;
+  };
 }

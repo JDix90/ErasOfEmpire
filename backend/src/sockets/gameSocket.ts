@@ -31,6 +31,10 @@ function loadMapFromDoc(mapDoc: any): GameMap {
     territories: mapDoc.territories,
     connections: mapDoc.connections,
     regions: mapDoc.regions,
+    canvas_width: mapDoc.canvas_width,
+    canvas_height: mapDoc.canvas_height,
+    projection_bounds: mapDoc.projection_bounds,
+    globe_view: mapDoc.globe_view,
   };
 }
 

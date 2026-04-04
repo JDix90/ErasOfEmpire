@@ -39,11 +39,11 @@ export const config = {
     port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
     user: process.env.POSTGRES_USER || 'chronouser',
     password: process.env.POSTGRES_PASSWORD || 'chronopass',
-    database: process.env.POSTGRES_DB || 'chronoconquest',
+    database: process.env.POSTGRES_DB || 'erasofempire',
   },
 
   mongo: {
-    uri: process.env.MONGO_URI || 'mongodb://chronouser:chronopass@localhost:27017/chronoconquest_maps?authSource=admin',
+    uri: process.env.MONGO_URI || 'mongodb://chronouser:chronopass@localhost:27017/erasofempire_maps?authSource=admin',
   },
 
   redis: {

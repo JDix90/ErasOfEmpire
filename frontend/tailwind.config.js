@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ChronoConquest brand palette
+        // Eras of Empire brand palette
         'cc-gold':    '#c9a84c',
         'cc-dark':    '#0f1117',
         'cc-surface': '#1a1f2e',

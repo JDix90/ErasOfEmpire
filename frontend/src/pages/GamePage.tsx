@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useGameStore, CombatResult } from '../store/gameStore';
 import { useUiStore } from '../store/uiStore';
@@ -108,6 +108,44 @@ export default function GamePage() {
   /** Increments when player completes an attack during attack_do — triggers auto phase advance */
   const [tutorialAttackAutoTick, setTutorialAttackAutoTick] = useState(0);
   const [socketConnection, setSocketConnection] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
+
+  /** Map area is flex-sized; measure it so Globe/PIXI get real pixels when the viewport changes (devtools, rotate, resize). */
+  const mapAreaRef = useRef<HTMLDivElement>(null);
+  const [mapCanvasSize, setMapCanvasSize] = useState(() => {
+    if (typeof window === 'undefined') return { w: 900, h: 600 };
+    const hud =
+      window.innerWidth < 768
+        ? Math.min(260, Math.floor(window.innerWidth * 0.36))
+        : 288;
+    return {
+      w: Math.max(120, window.innerWidth - hud),
+      h: Math.max(200, window.innerHeight - 40),
+    };
+  });
+
+  useLayoutEffect(() => {
+    if (!gameStarted || !gameState) return;
+    const el = mapAreaRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect();
+      const w = Math.max(120, Math.floor(width));
+      const h = Math.max(200, Math.floor(height));
+      setMapCanvasSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+    };
+  }, [gameStarted, gameState]);
 
   const pushModal = useCallback((data: ModalData) => {
     setModalQueue(prev => [...prev, data]);
@@ -728,11 +766,6 @@ export default function GamePage() {
     );
   }
 
-  const hudWidth = typeof window !== 'undefined' && window.innerWidth < 768
-    ? Math.min(260, Math.floor(window.innerWidth * 0.36))
-    : 288;
-  const mapCanvasW = typeof window !== 'undefined' ? Math.max(120, window.innerWidth - hudWidth) : 900;
-  const mapCanvasH = typeof window !== 'undefined' ? Math.max(200, window.innerHeight - 40) : 600;
   const reducedGlobe =
     prefersReducedMotion() || (isMobileViewport() && mapView === 'globe');
 
@@ -740,7 +773,7 @@ export default function GamePage() {
     <div className="h-screen bg-cc-dark flex flex-col overflow-hidden">
       {/* Top Bar */}
       <div className="min-h-10 pt-safe bg-cc-surface border-b border-cc-border flex items-center px-4 gap-4 shrink-0 py-1">
-        <Link to="/lobby" className="font-display text-cc-gold text-sm tracking-widest hover:text-white transition-colors">CHRONOCONQUEST</Link>
+        <Link to="/lobby" className="font-display text-cc-gold text-sm tracking-widest hover:text-white transition-colors">ERAS OF EMPIRE</Link>
         <span className="text-cc-muted text-xs">·</span>
         <span className="text-cc-muted text-xs capitalize">
           {gameState.era === 'custom' ? 'Community map' : `${gameState.era} Era`}
@@ -790,14 +823,17 @@ export default function GamePage() {
       {/* Main Game Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Map Canvas */}
-        <div className="flex-1 relative overflow-hidden">
+        <div
+          ref={mapAreaRef}
+          className="flex-1 relative overflow-hidden min-h-0 min-w-0"
+        >
           {mapData ? (
             mapView === 'globe' ? (
               <GlobeMap
                 mapData={mapData}
                 onTerritoryClick={handleTerritoryClick}
-                width={mapCanvasW}
-                height={mapCanvasH}
+                width={mapCanvasSize.w}
+                height={mapCanvasSize.h}
                 events={globeEvents}
                 onEventDone={handleGlobeEventDone}
                 reducedEffects={reducedGlobe}
@@ -806,8 +842,8 @@ export default function GamePage() {
               <GameMap
                 mapData={mapData}
                 onTerritoryClick={handleTerritoryClick}
-                width={mapCanvasW}
-                height={mapCanvasH}
+                width={mapCanvasSize.w}
+                height={mapCanvasSize.h}
               />
             )
           ) : (

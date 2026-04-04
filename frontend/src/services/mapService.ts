@@ -1,5 +1,5 @@
 /**
- * ChronoConquest — Frontend Map Service
+ * Eras of Empire — Frontend Map Service
  * Fetches map data from the backend API and provides type-safe access.
  */
 

@@ -1,5 +1,5 @@
 /**
- * ChronoConquest — Interactive 3D Globe Map
+ * Eras of Empire — Interactive 3D Globe Map
  * Renders territories on a spin-able 3D globe using react-globe.gl.
  * Supports animated event overlays: reinforcements, combat, and fortification.
  */
@@ -24,6 +24,10 @@ const COUNTRIES_GEOJSON_URL =
 /** US states/provinces (admin-1) — used for ACW territory outlines along real state borders */
 const STATES_GEOJSON_URL =
   'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_admin_1_states_provinces.geojson';
+
+/** Admin-1 for Canada (and other non-US) — community_14_nations merges with US states */
+const ADMIN50_STATES_GEOJSON_URL =
+  'https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_admin_1_states_provinces.geojson';
 
 /** Pre-extracted NE 10m Italy + San Marino + Vatican provinces (built from Natural Earth) */
 const RISORGIMENTO_GEOJSON_URL = '/geo/risorgimento_admin1.json';
@@ -251,6 +255,8 @@ export default function GlobeMap({
   const [statesGeo, setStatesGeo] = useState<GeoJSON.FeatureCollection | null>(null);
   /** Italy province polygons for era_risorgimento */
   const [risorgimentoGeo, setRisorgimentoGeo] = useState<GeoJSON.FeatureCollection | null>(null);
+  /** ne_50m admin-1 — Canadian provinces for community_14_nations */
+  const [admin50Geo, setAdmin50Geo] = useState<GeoJSON.FeatureCollection | null>(null);
   /** Bumps when react-globe.gl calls onGlobeReady so we can apply camera after the ref exists */
   const [globeReadyTick, setGlobeReadyTick] = useState(0);
 
@@ -311,6 +317,24 @@ export default function GlobeMap({
       });
   }, [needsRisorgimentoGeo]);
 
+  const needsAdmin50Geo =
+    mapData.map_id === 'community_14_nations' ||
+    mapData.territories.some((t) => t.territory_id.startsWith('na_'));
+
+  useEffect(() => {
+    if (!needsAdmin50Geo) {
+      setAdmin50Geo(null);
+      return;
+    }
+    fetch(ADMIN50_STATES_GEOJSON_URL)
+      .then((r) => r.json())
+      .then(setAdmin50Geo)
+      .catch((err) => {
+        console.warn('Failed to load ne_50m admin-1 GeoJSON:', err);
+        setAdmin50Geo({ type: 'FeatureCollection', features: [] });
+      });
+  }, [needsAdmin50Geo]);
+
   // ── Polygon data (territories) ─────────────────────────────────────────
 
   const polygonsData = useMemo(
@@ -319,8 +343,9 @@ export default function GlobeMap({
         countriesGeo,
         statesGeo,
         risorgimentoGeo,
+        admin50Geo,
       }),
-    [mapData, countriesGeo, statesGeo, risorgimentoGeo],
+    [mapData, countriesGeo, statesGeo, risorgimentoGeo, admin50Geo],
   );
 
   // ── Territory center lookup ────────────────────────────────────────────
@@ -425,17 +450,39 @@ export default function GlobeMap({
     );
   }, [regionalGlobe, reducedEffects, globeReadyTick]);
 
-  /** Library default (5°). Lower values increase triangle count; non-default winding + dense caps caused broken WebGL. */
-  const polygonCapCurvatureResolution = 5;
+  /**
+   * three-conic-polygon-geometry uses this as max segment length (degrees) before interpolating ring
+   * vertices, and skips interior grid points only when min(lng span, lat span) < this value.
+   * At the default 5°, large authored quads (14 Nations) get planar Delaunay + sphere lift → shard noise.
+   * Natural Earth regional maps need ~5° for smooth coastlines. Maps with `projection_bounds` use WGS84
+   * quads only → use 360° so we effectively keep the authored ring and earcut (no interior grid).
+   */
+  const polygonCapCurvatureResolution = useMemo(
+    () => (mapData.projection_bounds != null ? 360 : 5),
+    [mapData.projection_bounds],
+  );
+
+  /** Keep WebGL backing store in sync when the game resizes the map pane (devtools, sidebar, etc.). */
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe || width <= 0 || height <= 0) return;
+    globe.renderer().setSize(width, height);
+  }, [width, height, globeReadyTick]);
 
   const getPolygonAltitude = useCallback(
     (polygon: object) => {
       const id = (polygon as PolygonData).territory_id;
-      const base = regionalGlobe.lockRotation ? 0.0045 : 0.008;
-      const jitter = regionalGlobe.lockRotation ? polygonAltitudeHash(id) * 0.0012 : 0;
+      const authoredRegional = mapData.projection_bounds != null;
+      const base = authoredRegional
+        ? 0.0075
+        : regionalGlobe.lockRotation
+          ? 0.0045
+          : 0.008;
+      const jitter =
+        regionalGlobe.lockRotation || authoredRegional ? polygonAltitudeHash(id) * 0.0015 : 0;
       return base + jitter;
     },
-    [regionalGlobe.lockRotation],
+    [regionalGlobe.lockRotation, mapData.projection_bounds],
   );
 
   // ── Animation sequences ────────────────────────────────────────────────
@@ -895,7 +942,9 @@ export default function GlobeMap({
     const player = gameState.players.find((ply) => ply.player_id === tState.owner_id);
     if (!player) return empty;
     const table = useSolidPlayerCaps ? PLAYER_COLORS_SOLID : PLAYER_COLORS;
-    return table[player.color] ?? (useSolidPlayerCaps ? 'rgb(136, 136, 136)' : 'rgba(136, 136, 136, 0.92)');
+    const raw = (player.color || '').trim();
+    const lookupKey = raw.startsWith('#') ? raw.toLowerCase() : raw;
+    return table[lookupKey] ?? (useSolidPlayerCaps ? 'rgb(136, 136, 136)' : 'rgba(136, 136, 136, 0.92)');
   }, [gameState, useSolidPlayerCaps]);
 
   const adjacencyTargets = useMemo(() => {
