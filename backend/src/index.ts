@@ -19,12 +19,8 @@ import { usersRoutes } from './modules/users/users.routes';
 import { gamesRoutes } from './modules/games/games.routes';
 import { mapsRoutes } from './modules/maps/maps.routes';
 import { initGameSocket, shutdownGameSocket } from './sockets/gameSocket';
-import {
-  matchmakingRoutes,
-  setMatchmakingIo,
-  startMatchmakingSweep,
-  stopMatchmakingSweep,
-} from './modules/matchmaking/matchmaking.routes';
+import { matchmakingRoutes, setMatchmakingIo, startMatchmakingSweep, stopMatchmakingSweep } from './modules/matchmaking/matchmaking.routes';
+import { getEraTechTree } from './game-engine/eras';
 
 async function bootstrap(): Promise<void> {
   validateProductionEnv();
@@ -87,6 +83,16 @@ async function bootstrap(): Promise<void> {
   await app.register(matchmakingRoutes, { prefix: '/api/matchmaking' });
 
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  // Static era tech tree — public, no auth needed
+  app.get<{ Params: { era: string } }>('/api/eras/:era/tech-tree', async (req, reply) => {
+    try {
+      const techTree = getEraTechTree(req.params.era as Parameters<typeof getEraTechTree>[0]);
+      return reply.send({ techTree });
+    } catch {
+      return reply.code(404).send({ error: 'Unknown era' });
+    }
+  });
 
   await app.ready();
   const io = initGameSocket(app.server);

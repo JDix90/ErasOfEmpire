@@ -12,6 +12,7 @@ function makeSettings(overrides?: Partial<GameSettings>): GameSettings {
   return {
     fog_of_war: false,
     victory_type: 'domination',
+    allowed_victory_conditions: ['domination'],
     turn_timer_seconds: 0,
     initial_unit_count: 3,
     card_set_escalating: true,
@@ -31,6 +32,8 @@ function makePlayer(id: string, idx: number, extras?: Partial<PlayerState>): Pla
     territory_count: 0,
     cards: [],
     mmr: 1000,
+    capital_territory_id: null,
+    secret_mission: null,
     ...extras,
   };
 }
@@ -234,6 +237,18 @@ describe('advanceToNextPlayer', () => {
 
 // ── checkVictory ─────────────────────────────────────────────────────────────
 
+const victoryMap: GameMap = {
+  map_id: 'test_map',
+  name: 'Test',
+  territories: [
+    { territory_id: 't1', name: 'T1', polygon: [], center_point: [0, 0], region_id: 'r1' },
+    { territory_id: 't2', name: 'T2', polygon: [], center_point: [0, 0], region_id: 'r1' },
+    { territory_id: 't3', name: 'T3', polygon: [], center_point: [0, 0], region_id: 'r1' },
+  ],
+  connections: [],
+  regions: [{ region_id: 'r1', name: 'R1', bonus: 2 }],
+};
+
 describe('checkVictory', () => {
   it('returns winner when only one active player remains', () => {
     const state = makeState({
@@ -242,7 +257,7 @@ describe('checkVictory', () => {
         makePlayer('p2', 1, { is_eliminated: true, territory_count: 0 }),
       ],
     });
-    expect(checkVictory(state)).toBe('p1');
+    expect(checkVictory(state, victoryMap)).toEqual({ winnerId: 'p1', condition: 'last_standing' });
   });
 
   it('returns null when multiple players remain', () => {
@@ -252,7 +267,7 @@ describe('checkVictory', () => {
         makePlayer('p2', 1, { territory_count: 1 }),
       ],
     });
-    expect(checkVictory(state)).toBeNull();
+    expect(checkVictory(state, victoryMap)).toBeNull();
   });
 
   it('detects domination when one player owns all territories', () => {
@@ -262,6 +277,33 @@ describe('checkVictory', () => {
         makePlayer('p2', 1, { territory_count: 0 }),
       ],
     });
-    expect(checkVictory(state)).toBe('p1');
+    expect(checkVictory(state, victoryMap)).toEqual({ winnerId: 'p1', condition: 'domination' });
+  });
+
+  it('does not award domination when domination is disabled', () => {
+    const state = makeState({
+      settings: makeSettings({
+        allowed_victory_conditions: ['capital'],
+      }),
+      players: [
+        makePlayer('p1', 0, { territory_count: 3 }),
+        makePlayer('p2', 1, { territory_count: 0 }),
+      ],
+    });
+    expect(checkVictory(state, victoryMap)).toBeNull();
+  });
+
+  it('threshold victory when enabled', () => {
+    const state = makeState({
+      settings: makeSettings({
+        allowed_victory_conditions: ['threshold'],
+        victory_threshold: 50,
+      }),
+      players: [
+        makePlayer('p1', 0, { territory_count: 2 }),
+        makePlayer('p2', 1, { territory_count: 1 }),
+      ],
+    });
+    expect(checkVictory(state, victoryMap)).toEqual({ winnerId: 'p1', condition: 'threshold' });
   });
 });

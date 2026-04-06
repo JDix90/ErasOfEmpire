@@ -159,6 +159,15 @@ interface RingDatum {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return `rgba(46, 125, 158, ${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function computeCentroid(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon): { lat: number; lng: number } {
   let sumLng = 0, sumLat = 0, count = 0;
   const allPolys = geometry.type === 'Polygon'
@@ -896,6 +905,64 @@ export default function GlobeMap({
     return map;
   }, [polygonsData]);
 
+  const buildingHtmlOverlays = useMemo((): HtmlDatum[] => {
+    if (!gameState) return [];
+    const out: HtmlDatum[] = [];
+    for (const [tid, tState] of Object.entries(gameState.territories)) {
+      const buildings: string[] = (tState as { buildings?: string[] }).buildings ?? [];
+      if (buildings.length === 0) continue;
+      const c = territoryCentroids.get(tid);
+      if (!c) continue;
+      const icons = buildings
+        .map((b: string) => {
+          if (b.includes('port') || b.includes('naval')) return '⚓';
+          if (b.includes('fort') || b.includes('wall') || b.includes('defense') || b.includes('castle')) return '🛡';
+          if (b.includes('lab') || b.includes('acad') || b.includes('univ') || b.includes('research')) return '🔬';
+          if (b.includes('farm') || b.includes('mine') || b.includes('market') || b.includes('production') || b.includes('plantation')) return '⚙';
+          return '🏛';
+        })
+        .join('');
+      out.push({
+        id: `building-globe-${tid}`,
+        lat: c.lat,
+        lng: c.lng,
+        alt: 0.055,
+        html: `<div style="font-size:10px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,0.9);pointer-events:none;" title="${buildings.join(', ')}">${icons}</div>`,
+      });
+    }
+    return out;
+  }, [gameState, territoryCentroids]);
+
+  const capitalHtmlOverlays = useMemo((): HtmlDatum[] => {
+    if (!gameState) return [];
+    const out: HtmlDatum[] = [];
+    for (const pl of gameState.players) {
+      if (!pl.capital_territory_id) continue;
+      const c = territoryCentroids.get(pl.capital_territory_id);
+      if (!c) continue;
+      out.push({
+        id: `capital-globe-${pl.player_id}`,
+        lat: c.lat,
+        lng: c.lng,
+        alt: 0.045,
+        html: `<div style="
+          width:12px;height:12px;
+          transform:rotate(45deg);
+          border:2px solid #ffd700;
+          background:${pl.color};
+          box-shadow:0 0 6px rgba(0,0,0,0.85);
+          pointer-events:none;
+        " title="Capital"></div>`,
+      });
+    }
+    return out;
+  }, [gameState, territoryCentroids]);
+
+  const combinedHtmlOverlays = useMemo(
+    () => [...capitalHtmlOverlays, ...buildingHtmlOverlays, ...overlays],
+    [capitalHtmlOverlays, buildingHtmlOverlays, overlays],
+  );
+
   const adjacencyArcs = useMemo(() => {
     if (!gameState) return [];
     const phase = gameState.phase;
@@ -956,7 +1023,65 @@ export default function GlobeMap({
     return result;
   }, [gameState, attackSource, selectedTerritory, mapData.connections, territoryCentroids]);
 
-  const combinedArcs = useMemo(() => [...arcs, ...adjacencyArcs], [arcs, adjacencyArcs]);
+  // ── Permanent sea lane arcs ────────────────────────────────────────────
+  // Sea-route territories (region_id === 'sea_routes') are rendered as tiny
+  // polygon markers on the ocean.  These arcs draw the actual trade-route
+  // spokes from each marker hub to every land territory it connects.
+
+  const seaRouteTerritoryIds = useMemo(
+    () => new Set(mapData.territories.filter((t) => t.region_id === 'sea_routes').map((t) => t.territory_id)),
+    [mapData.territories],
+  );
+
+  const seaLaneArcs = useMemo((): ArcDatum[] => {
+    if (seaRouteTerritoryIds.size === 0) return [];
+    const result: ArcDatum[] = [];
+
+    for (const seaId of seaRouteTerritoryIds) {
+      const seaCenter = territoryCentroids.get(seaId);
+      if (!seaCenter) continue;
+
+      // Color by current owner, else default ocean teal
+      let c0 = 'rgba(46, 125, 158, 0.55)';
+      let c1 = 'rgba(46, 125, 158, 0.18)';
+      if (gameState) {
+        const ownerId = gameState.territories[seaId]?.owner_id;
+        const owner = ownerId ? gameState.players.find((p) => p.player_id === ownerId) : null;
+        if (owner?.color) {
+          c0 = hexToRgba(owner.color, 0.55);
+          c1 = hexToRgba(owner.color, 0.18);
+        }
+      }
+
+      for (const conn of mapData.connections) {
+        const neighborId = conn.from === seaId ? conn.to : conn.to === seaId ? conn.from : null;
+        if (!neighborId) continue;
+        if (seaRouteTerritoryIds.has(neighborId)) continue; // skip sea-to-sea
+        const neighborCenter = territoryCentroids.get(neighborId);
+        if (!neighborCenter) continue;
+
+        result.push({
+          id: `sealane-${seaId}-${neighborId}`,
+          startLat: seaCenter.lat,
+          startLng: seaCenter.lng,
+          endLat: neighborCenter.lat,
+          endLng: neighborCenter.lng,
+          color: [c0, c1],
+          stroke: 1.0,
+          dashLen: 0.35,
+          dashGap: 0.25,
+          animateTime: 6000,
+          altitude: 0.1,
+        });
+      }
+    }
+    return result;
+  }, [seaRouteTerritoryIds, territoryCentroids, mapData.connections, gameState]);
+
+  const combinedArcs = useMemo(
+    () => [...seaLaneArcs, ...arcs, ...adjacencyArcs],
+    [seaLaneArcs, arcs, adjacencyArcs],
+  );
 
   // ── Polygon accessors ──────────────────────────────────────────────────
 
@@ -1081,7 +1206,7 @@ export default function GlobeMap({
         onPolygonClick={(polygon) => polygon && onTerritoryClick((polygon as PolygonData).territory_id)}
 
         /* HTML overlays (floating text) */
-        htmlElementsData={overlays}
+        htmlElementsData={combinedHtmlOverlays}
         htmlLat={htmlElAccessors.lat}
         htmlLng={htmlElAccessors.lng}
         htmlAltitude={htmlElAccessors.alt}

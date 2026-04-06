@@ -895,7 +895,13 @@
         70,
         583
       ],
-      "region_id": "sea_routes"
+      "region_id": "sea_routes",
+      "geo_polygon": [
+        [-21, -9],
+        [-19, -9],
+        [-19, -11],
+        [-21, -11]
+      ]
     },
     {
       "territory_id": "indian_ocean",
@@ -922,7 +928,13 @@
         650,
         500
       ],
-      "region_id": "sea_routes"
+      "region_id": "sea_routes",
+      "geo_polygon": [
+        [64, 0],
+        [66, 0],
+        [66, -2],
+        [64, -2]
+      ]
     }
   ],
   "connections": [

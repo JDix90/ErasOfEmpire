@@ -1,30 +1,58 @@
 import type { FastifyInstance } from 'fastify';
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import { z } from 'zod';
+import type { VictoryType } from '../../types';
 import { authenticate } from '../../middleware/authenticate';
 import { rejectGuest } from '../../middleware/rejectGuest';
 import { query, queryOne } from '../../db/postgres';
 import { generateJoinCode, normalizeJoinInput } from '../../utils/joinCode';
 import { getGameIo } from '../../sockets/gameSocket';
+import { normalizeGameSettings } from '../../game-engine/state/gameSettings';
 
 /** Optional body for POST /tutorial/start — default matches lobby quick-start (small tutorial map). */
 const TutorialStartSchema = z.object({
   era: z.enum(['ancient', 'ww2']).optional(),
 });
 
+const victoryConditionEnum = z.enum(['domination', 'secret_mission', 'capital', 'threshold']);
+
 const CreateGameSchema = z.object({
   era_id: z.enum(['ancient', 'medieval', 'discovery', 'ww2', 'coldwar', 'modern', 'acw', 'risorgimento', 'custom']),
   map_id: z.string().min(1).max(128),
   max_players: z.number().int().min(2).max(8),
-  settings: z.object({
-    fog_of_war: z.boolean().default(false),
-    victory_type: z.enum(['domination', 'secret_mission', 'capital', 'threshold']).default('domination'),
-    victory_threshold: z.number().optional(),
-    turn_timer_seconds: z.number().int().min(0).default(300),
-    initial_unit_count: z.number().int().min(1).max(10).default(3),
-    card_set_escalating: z.boolean().default(true),
-    diplomacy_enabled: z.boolean().default(true),
-  }),
+  settings: z
+    .object({
+      fog_of_war: z.boolean().default(false),
+      allowed_victory_conditions: z.array(victoryConditionEnum).min(1).max(4).optional(),
+      /** Legacy single-select; ignored when `allowed_victory_conditions` is set. */
+      victory_type: victoryConditionEnum.optional(),
+      victory_threshold: z.number().min(1).max(99).optional(),
+      turn_timer_seconds: z.number().int().min(0).default(300),
+      initial_unit_count: z.number().int().min(1).max(10).default(3),
+      card_set_escalating: z.boolean().default(true),
+      diplomacy_enabled: z.boolean().default(true),
+      factions_enabled: z.boolean().optional(),
+      economy_enabled: z.boolean().optional(),
+      tech_trees_enabled: z.boolean().optional(),
+      events_enabled: z.boolean().optional(),
+      naval_enabled: z.boolean().optional(),
+      stability_enabled: z.boolean().optional(),
+    })
+    .superRefine((data, ctx) => {
+      const list =
+        data.allowed_victory_conditions && data.allowed_victory_conditions.length > 0
+          ? data.allowed_victory_conditions
+          : data.victory_type
+            ? [data.victory_type]
+            : ['domination'];
+      if (list.includes('threshold') && data.victory_threshold == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'victory_threshold (1–99) is required when threshold victory is enabled',
+          path: ['victory_threshold'],
+        });
+      }
+    }),
   ai_count: z.number().int().min(0).max(7).default(0),
   ai_difficulty: z.enum(['easy', 'medium', 'hard', 'expert']).default('medium'),
 });
@@ -36,7 +64,18 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
     if (!body.success) {
       return reply.status(400).send({ error: 'Invalid input', details: body.error.flatten() });
     }
-    const { era_id, map_id, max_players, settings, ai_count, ai_difficulty } = body.data;
+    const { era_id, map_id, max_players, settings: rawSettings, ai_count, ai_difficulty } = body.data;
+
+    const mergedList: VictoryType[] =
+      rawSettings.allowed_victory_conditions && rawSettings.allowed_victory_conditions.length > 0
+        ? [...new Set(rawSettings.allowed_victory_conditions)]
+        : rawSettings.victory_type
+          ? [rawSettings.victory_type]
+          : ['domination'];
+    const settings = normalizeGameSettings({
+      ...rawSettings,
+      allowed_victory_conditions: mergedList,
+    });
 
     const gameId = uuidv4();
     const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#ecf0f1'];
@@ -97,7 +136,8 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
     const gameId = uuidv4();
     const tutorialSettings = {
       fog_of_war: false,
-      victory_type: 'domination',
+      allowed_victory_conditions: ['domination'] as const,
+      victory_type: 'domination' as const,
       turn_timer_seconds: 0,
       initial_unit_count: 3,
       card_set_escalating: false,

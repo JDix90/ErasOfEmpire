@@ -15,8 +15,21 @@ import {
   appendWinProbabilitySnapshot,
   repairDraftUnitsIfMissing,
   autoPlaceDraftUnits,
+  repairLegacyGameState,
 } from '../game-engine/state/gameStateManager';
 import { resolveCombat, calculateReinforcements } from '../game-engine/combat/combatResolver';
+import {
+  validateBuild,
+  applyBuild,
+  getBuildingDefenseBonus,
+  onTerritoryCapture,
+} from '../game-engine/state/economyManager';
+import { validateResearch, applyResearch, getPlayerAttackBonus, getPlayerDefenseBonus } from '../game-engine/state/techManager';
+import { getTechNodeById, getEraFactions, getEraTechTree } from '../game-engine/eras';
+import { resolveEventChoice, getTemporaryModifierValue } from '../game-engine/events/eventCardManager';
+import { moveFleets, resolveNavalCombat } from '../game-engine/state/navalManager';
+import { onCaptureStabilityPenalty, onInfluenceStabilityPenalty } from '../game-engine/state/stabilityManager';
+import type { BuildingType } from '../types';
 import { runAiWithTimeout } from '../game-engine/ai/runAiWithTimeout';
 import { recordGameResults, computeRanks } from '../game-engine/state/statsManager';
 import { checkAndUnlockAchievements } from '../game-engine/achievements/achievementService';
@@ -172,6 +185,7 @@ export function initGameSocket(httpServer: HttpServer): Server {
               return socket.emit('error', { message: 'Map unavailable; the game cannot be resumed right now', code: 'MAP_LOAD_FAILED' });
             }
             repairDraftUnitsIfMissing(savedState.state_json, gameMap);
+            repairLegacyGameState(savedState.state_json, gameMap);
             activeGames.set(gameId, {
               state: savedState.state_json,
               map: gameMap,
@@ -184,6 +198,11 @@ export function initGameSocket(httpServer: HttpServer): Server {
         if (room) {
           room.connectedSockets.set(socket.id, userId);
           socket.emit('game:state', buildClientState(room.state, userId, room.state.settings.fog_of_war));
+
+          // Re-broadcast any pending choice-based event card so reconnecting players see the modal
+          if (room.state.active_event?.choices?.length) {
+            socket.emit('game:event_card', room.state.active_event);
+          }
 
           // Resume AI turn if it's an AI's turn and no AI processing is already in-flight
           const currentAiPlayer = room.state.players[room.state.current_player_index];
@@ -228,6 +247,8 @@ export function initGameSocket(httpServer: HttpServer): Server {
               console.error(`[Socket] MAP_LOAD_FAILED: game=${gameId} map_id=${game.map_id}`);
               return socket.emit('error', { message: 'Map unavailable; the game cannot be resumed right now', code: 'MAP_LOAD_FAILED' });
             }
+            repairDraftUnitsIfMissing(savedState.state_json, gameMap);
+            repairLegacyGameState(savedState.state_json, gameMap);
             activeGames.set(gameId, {
               state: savedState.state_json,
               map: gameMap,
@@ -366,11 +387,93 @@ export function initGameSocket(httpServer: HttpServer): Server {
       );
       if (!isAdjacent) return socket.emit('error', { message: 'Territories not adjacent' });
 
+      // Determine attack dice count
+      // Modern era precision strike: 3 dice when attacker has ≥3 units committed
+      const precisionDiceOverride =
+        state.era_modifiers?.precision_strike && fromTerritory.unit_count >= 4
+          ? 3
+          : undefined;
+
+      // Discovery era sea lanes: check if the connection is a sea lane — if so, attacker gets only 2 dice
+      const connection = map.connections.find(
+        (c) => (c.from === fromId && c.to === toId) || (c.from === toId && c.to === fromId)
+      );
+      const seaLanesOverride =
+        state.era_modifiers?.sea_lanes && connection?.type === 'sea'
+          ? Math.min(fromTerritory.unit_count - 1, 2)
+          : undefined;
+
+      // Naval warfare: sea-lane attacks require fleets when naval_enabled
+      if (state.settings.naval_enabled && connection?.type === 'sea') {
+        if (!fromTerritory.naval_units || fromTerritory.naval_units <= 0) {
+          return socket.emit('error', { message: 'No fleet to traverse sea lane' });
+        }
+        const defenderFleets = toTerritory.naval_units ?? 0;
+        if (defenderFleets > 0) {
+          // Resolve naval combat first
+          const navalResult = resolveNavalCombat(fromTerritory.naval_units, defenderFleets);
+          fromTerritory.naval_units = Math.max(0, fromTerritory.naval_units - navalResult.attacker_losses);
+          toTerritory.naval_units = Math.max(0, defenderFleets - navalResult.defender_losses);
+          io.to(gameId).emit('game:naval_combat_result', {
+            fromId, toId,
+            result: navalResult,
+          });
+          if (!navalResult.attacker_won) {
+            // Naval defeat — abort land attack
+            broadcastState(io, gameId, state);
+            scheduleDebouncedSave(gameId);
+            return;
+          }
+        }
+        // Attacker won naval combat or no defenders — consume 1 fleet for the crossing
+        fromTerritory.naval_units = Math.max(0, fromTerritory.naval_units - 1);
+      }
+
+      const attackerDiceOverride = precisionDiceOverride ?? seaLanesOverride;
+
+      // Economy: building defense bonus + tech tree passive defense bonus + faction passive defense
+      const buildingDefenseBonus = getBuildingDefenseBonus(state, toId);
+      const techDefenseBonus = state.settings.tech_trees_enabled
+        ? getPlayerDefenseBonus(state, toTerritory.owner_id ?? '')
+        : 0;
+      const defenderFaction = state.settings.factions_enabled
+        ? (() => {
+            const dp = state.players.find((p) => p.player_id === toTerritory.owner_id);
+            return dp?.faction_id ? getEraFactions(state.era).find((f) => f.faction_id === dp.faction_id) : undefined;
+          })()
+        : undefined;
+      const factionDefenseBonus = defenderFaction?.passive_defense_bonus ?? 0;
+      const eventDefenseBonus = state.settings.events_enabled && toTerritory.owner_id
+        ? getTemporaryModifierValue(state, toTerritory.owner_id, 'defense_modifier')
+        : 0;
+      const totalDefenseBonus = buildingDefenseBonus + techDefenseBonus + factionDefenseBonus + eventDefenseBonus;
+      const defenderDiceOverride = totalDefenseBonus > 0
+        ? Math.min(toTerritory.unit_count, 2) + totalDefenseBonus
+        : undefined;
+
+      // Tech tree passive attack bonus + faction passive attack bonus
+      const techAttackBonus = state.settings.tech_trees_enabled
+        ? getPlayerAttackBonus(state, userId)
+        : 0;
+      const attackerFaction = state.settings.factions_enabled && currentPlayer.faction_id
+        ? getEraFactions(state.era).find((f) => f.faction_id === currentPlayer.faction_id)
+        : undefined;
+      const factionAttackBonus = attackerFaction?.passive_attack_bonus ?? 0;
+      const eventAttackBonus = state.settings.events_enabled
+        ? getTemporaryModifierValue(state, userId, 'attack_modifier')
+        : 0;
+      const combinedAttackBonus = techAttackBonus + factionAttackBonus + eventAttackBonus;
+      const finalAttackerDiceOverride = attackerDiceOverride !== undefined
+        ? attackerDiceOverride + combinedAttackBonus
+        : combinedAttackBonus > 0
+          ? Math.min(fromTerritory.unit_count - 1, 3) + combinedAttackBonus
+          : undefined;
+
       const result = resolveCombat(
       fromTerritory.unit_count,
       toTerritory.unit_count,
-      undefined,
-      undefined,
+      finalAttackerDiceOverride,
+      defenderDiceOverride,
       undefined,
       state.era_modifiers,
     );
@@ -386,6 +489,12 @@ export function initGameSocket(httpServer: HttpServer): Server {
         toTerritory.unit_count = Math.min(fromTerritory.unit_count - 1, 3);
         fromTerritory.unit_count = Math.max(1, fromTerritory.unit_count - toTerritory.unit_count);
         cardEarned = true;
+        // Raze buildings on capture
+        onTerritoryCapture(state, toId);
+        // Stability penalty on captured territory
+        if (state.settings.stability_enabled) {
+          onCaptureStabilityPenalty(state, toId);
+        }
 
         const defenderPlayer = state.players.find((p) => p.player_id === defenderId);
         if (defenderPlayer) {
@@ -410,10 +519,12 @@ export function initGameSocket(httpServer: HttpServer): Server {
       if (cardEarned) drawCard(state, userId);
 
       // Check victory
-      const winnerId = checkVictory(state);
-      if (winnerId) {
+      const victoryResult = checkVictory(state, map);
+      if (victoryResult) {
+        const { winnerId, condition } = victoryResult;
         state.phase = 'game_over';
         state.winner_id = winnerId;
+        state.victory_condition = condition;
         finalizeGame(io, gameId, state, winnerId);
       } else if (defenderEliminated) {
         appendWinProbabilitySnapshot(state);
@@ -440,13 +551,14 @@ export function initGameSocket(httpServer: HttpServer): Server {
         state.phase = 'fortify';
       } else if (state.phase === 'fortify') {
         advanceToNextPlayer(state, map);
-        saveGameState(gameId, state);
+        broadcastEventCard(io, gameId, state, map);
 
         // Trigger AI if next player is AI; otherwise restart turn timer
         if (state.players[state.current_player_index].is_ai) {
           clearTurnTimer(gameId);
           setTimeout(() => processAiTurn(io, gameId), 1500);
-        } else {
+        } else if (!state.active_event?.choices?.length) {
+          // Don't start timer while a choice-based event awaits resolution
           startTurnTimer(io, gameId, state, map);
         }
       }
@@ -480,8 +592,16 @@ export function initGameSocket(httpServer: HttpServer): Server {
         return socket.emit('error', { message: 'No connected path between territories' });
       }
 
+      // Enforce fortify move limit (wartime_logistics allows 2 per turn, otherwise 1)
+      const fortifyMoveLimit = state.era_modifiers?.wartime_logistics ? 2 : 1;
+      const movesUsed = state.fortify_moves_used ?? 0;
+      if (movesUsed >= fortifyMoveLimit) {
+        return socket.emit('error', { message: `Fortify limit reached (${fortifyMoveLimit} moves per turn)` });
+      }
+
       from.unit_count -= units;
       to.unit_count += units;
+      state.fortify_moves_used = movesUsed + 1;
       broadcastState(io, gameId, state);
       scheduleDebouncedSave(gameId);
     });
@@ -504,6 +624,383 @@ export function initGameSocket(httpServer: HttpServer): Server {
         scheduleDebouncedSave(gameId);
       } catch (err: unknown) {
         socket.emit('error', { message: err instanceof Error ? err.message : 'Card redemption failed' });
+      }
+    });
+
+    // ── Build (Economy) ──────────────────────────────────────────────────────
+    socket.on('game:build', ({ gameId, territoryId, buildingType }: {
+      gameId: string; territoryId: string; buildingType: BuildingType;
+    }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state } = room;
+
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+      // Allow building in draft OR fortify phase so players have flexibility
+      if (state.phase !== 'draft' && state.phase !== 'fortify') {
+        return socket.emit('error', { message: 'Buildings can only be constructed during draft or fortify phase' });
+      }
+
+      // Check whether the building type is unlocked via tech tree (if enabled)
+      const unlockedTechs = currentPlayer.unlocked_techs ?? [];
+      let techUnlocked = true;
+      if (state.settings.tech_trees_enabled) {
+        const techTree = getEraTechTree(state.era);
+        const requiringNode = techTree.find((node) => node.unlocks_building === buildingType);
+        if (requiringNode) {
+          techUnlocked = unlockedTechs.includes(requiringNode.tech_id);
+        }
+      }
+
+      const validation = validateBuild(state, userId, territoryId, buildingType, techUnlocked);
+      if (!validation.valid) {
+        return socket.emit('error', { message: validation.error ?? 'Cannot build here' });
+      }
+
+      applyBuild(state, userId, territoryId, buildingType);
+      socket.emit('game:build_result', { territoryId, buildingType, success: true });
+      broadcastState(io, gameId, state);
+      scheduleDebouncedSave(gameId);
+    });
+
+    // ── Naval Move (relocate fleets between own coastal territories) ─────────
+    socket.on('game:naval_move', ({ gameId, fromId, toId, count }: {
+      gameId: string; fromId: string; toId: string; count: number;
+    }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state, map } = room;
+
+      if (!state.settings.naval_enabled) return socket.emit('error', { message: 'Naval warfare not enabled' });
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+      if (state.phase !== 'attack' && state.phase !== 'fortify') {
+        return socket.emit('error', { message: 'Fleets can only move during attack or fortify phase' });
+      }
+
+      const result = moveFleets(state, fromId, toId, count, map, userId);
+      if (!result.success) return socket.emit('error', { message: result.error ?? 'Fleet move failed' });
+
+      broadcastState(io, gameId, state);
+      scheduleDebouncedSave(gameId);
+    });
+
+    // ── Naval Attack (standalone fleet combat / blockade) ────────────────────
+    socket.on('game:naval_attack', ({ gameId, fromId, toId }: {
+      gameId: string; fromId: string; toId: string;
+    }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state, map } = room;
+
+      if (!state.settings.naval_enabled) return socket.emit('error', { message: 'Naval warfare not enabled' });
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+      if (state.phase !== 'attack') return socket.emit('error', { message: 'Not in attack phase' });
+
+      const fromTerritory = state.territories[fromId];
+      const toTerritory = state.territories[toId];
+      if (!fromTerritory || fromTerritory.owner_id !== userId) {
+        return socket.emit('error', { message: 'Invalid attacking territory' });
+      }
+      if (!toTerritory || toTerritory.owner_id === userId) {
+        return socket.emit('error', { message: 'Invalid target territory' });
+      }
+      if (!fromTerritory.naval_units || fromTerritory.naval_units <= 0) {
+        return socket.emit('error', { message: 'No fleets to attack with' });
+      }
+      if (toTerritory.naval_units == null) {
+        return socket.emit('error', { message: 'Target is not a coastal territory' });
+      }
+
+      // Validate sea connection
+      const seaConnected = map.connections.some(
+        (c) => c.type === 'sea' && ((c.from === fromId && c.to === toId) || (c.from === toId && c.to === fromId)),
+      );
+      if (!seaConnected) return socket.emit('error', { message: 'No sea connection' });
+
+      const navalResult = resolveNavalCombat(fromTerritory.naval_units, toTerritory.naval_units || 1);
+      fromTerritory.naval_units = Math.max(0, fromTerritory.naval_units - navalResult.attacker_losses);
+      toTerritory.naval_units = Math.max(0, (toTerritory.naval_units ?? 0) - navalResult.defender_losses);
+
+      io.to(gameId).emit('game:naval_combat_result', { fromId, toId, result: navalResult });
+      broadcastState(io, gameId, state);
+      scheduleDebouncedSave(gameId);
+    });
+
+    // ── Research Tech ────────────────────────────────────────────────────────
+    socket.on('game:research_tech', ({ gameId, techId }: { gameId: string; techId: string }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state } = room;
+
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+      if (state.phase !== 'draft' && state.phase !== 'fortify') {
+        return socket.emit('error', { message: 'Technology can only be researched during draft or fortify phase' });
+      }
+
+      const validation = validateResearch(state, userId, techId);
+      if (!validation.valid) {
+        return socket.emit('error', { message: validation.error ?? 'Cannot research this technology' });
+      }
+
+      applyResearch(state, userId, validation.node!);
+      socket.emit('game:research_result', { techId, success: true, node: validation.node });
+      broadcastState(io, gameId, state);
+      scheduleDebouncedSave(gameId);
+    });
+
+    // ── Use Ability ──────────────────────────────────────────────────────────
+    // Generic handler for once-per-turn faction/tech abilities not covered by
+    // dedicated events (influence, blitzkrieg, etc.).
+    socket.on('game:use_ability', ({ gameId, abilityId, params }: {
+      gameId: string;
+      abilityId: string;
+      params?: Record<string, unknown>;
+    }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state, map } = room;
+
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+
+      // Check ability cooldown (once per turn)
+      const uses = currentPlayer.ability_uses ?? {};
+      if (uses[abilityId]) {
+        return socket.emit('error', { message: `Ability '${abilityId}' already used this turn` });
+      }
+
+      // Validate ability ownership — must come from faction or unlocked tech
+      const faction = state.settings.factions_enabled && currentPlayer.faction_id
+        ? getEraFactions(state.era).find((f) => f.faction_id === currentPlayer.faction_id)
+        : undefined;
+      const hasFactionAbility = faction?.ability_id === abilityId;
+
+      const unlockedTechs = currentPlayer.unlocked_techs ?? [];
+      const techTree = state.settings.tech_trees_enabled ? getEraTechTree(state.era) : [];
+      const hasTechAbility = techTree.some(
+        (n) => unlockedTechs.includes(n.tech_id) && n.unlocks_ability === abilityId
+      );
+
+      if (!hasFactionAbility && !hasTechAbility) {
+        return socket.emit('error', { message: `Ability '${abilityId}' is not available to you` });
+      }
+
+      // Record the use before delegating to specialized handlers
+      currentPlayer.ability_uses = { ...uses, [abilityId]: 1 };
+
+      // ── Ability: blitzkrieg (WW2 Germany) ──────────────────────────────────
+      if (abilityId === 'blitzkrieg' || abilityId === 'double_blitz') {
+        // Mark state so next captured territory allows a free bonus attack
+        state.blitzkrieg_attacked = false; // reset — the flag means "bonus attack already fired"
+        socket.emit('game:ability_result', { abilityId, success: true, effect: 'blitzkrieg_ready' });
+        broadcastState(io, gameId, state);
+        return;
+      }
+
+      // ── Ability: guerrilla_warfare (China WW2) — place 1 free unit ─────────
+      if (abilityId === 'guerrilla_warfare') {
+        const territoryId = params?.territoryId as string;
+        if (!territoryId) return socket.emit('error', { message: 'Provide territoryId' });
+        const t = state.territories[territoryId];
+        if (!t || t.owner_id !== userId) return socket.emit('error', { message: 'Invalid territory' });
+        t.unit_count += 1;
+        syncTerritoryCounts(state);
+        socket.emit('game:ability_result', { abilityId, success: true, territoryId });
+        broadcastState(io, gameId, state);
+        scheduleDebouncedSave(gameId);
+        return;
+      }
+
+      // ── Ability: cyber_attack — remove 1 enemy unit ────────────────────────
+      if (abilityId === 'cyber_attack') {
+        const territoryId = params?.territoryId as string;
+        if (!territoryId) return socket.emit('error', { message: 'Provide territoryId' });
+        const t = state.territories[territoryId];
+        if (!t || t.owner_id === userId) return socket.emit('error', { message: 'Invalid enemy territory' });
+        // Verify adjacency
+        const isAdj = map.connections.some(
+          (c) => (c.from === territoryId && Object.keys(state.territories).some(
+            (tid) => tid === c.to && state.territories[tid]?.owner_id === userId
+          )) || (c.to === territoryId && Object.keys(state.territories).some(
+            (tid) => tid === c.from && state.territories[tid]?.owner_id === userId
+          ))
+        );
+        if (!isAdj) return socket.emit('error', { message: 'Territory not adjacent to any of your territories' });
+        t.unit_count = Math.max(1, t.unit_count - 1);
+        socket.emit('game:ability_result', { abilityId, success: true, territoryId });
+        broadcastState(io, gameId, state);
+        scheduleDebouncedSave(gameId);
+        return;
+      }
+
+      // Default: acknowledge but take no mechanical action (client-side visual only)
+      socket.emit('game:ability_result', { abilityId, success: true });
+      broadcastState(io, gameId, state);
+    });
+
+    // ── Influence (Cold War / Risorgimento era ability) ──────────────────────
+    // Converts a neutral or enemy territory within influence_range hops of any
+    // owned territory, costing 3 of the current player's units (spread across
+    // adjacent owned territories). Only one use per turn.
+    socket.on('game:influence', ({ gameId, targetId }: { gameId: string; targetId: string }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state, map } = room;
+
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+      if (state.phase !== 'attack') return socket.emit('error', { message: 'Influence can only be used in the attack phase' });
+
+      const modifiers = state.era_modifiers;
+      const canInfluence = modifiers?.influence_spread || modifiers?.carbonari_network;
+      if (!canInfluence) return socket.emit('error', { message: 'Influence ability not available this era' });
+
+      if (state.influence_used_this_turn) {
+        return socket.emit('error', { message: 'Influence ability already used this turn' });
+      }
+
+      const target = state.territories[targetId];
+      if (!target) return socket.emit('error', { message: 'Invalid territory' });
+      if (target.owner_id === userId) return socket.emit('error', { message: 'Cannot influence your own territory' });
+
+      // BFS to check target is within influence_range hops from any owned territory
+      const hopLimit = modifiers?.influence_range ?? 1;
+      const adjacency: Record<string, string[]> = {};
+      for (const conn of map.connections) {
+        if (!adjacency[conn.from]) adjacency[conn.from] = [];
+        if (!adjacency[conn.to]) adjacency[conn.to] = [];
+        adjacency[conn.from].push(conn.to);
+        adjacency[conn.to].push(conn.from);
+      }
+
+      const ownedSet = new Set(
+        Object.entries(state.territories)
+          .filter(([, t]) => t.owner_id === userId)
+          .map(([id]) => id)
+      );
+
+      let reachable = false;
+      const visited = new Set<string>(ownedSet);
+      let frontier = [...ownedSet];
+      for (let hop = 0; hop < hopLimit; hop++) {
+        const next: string[] = [];
+        for (const tid of frontier) {
+          for (const nid of (adjacency[tid] ?? [])) {
+            if (!visited.has(nid)) {
+              visited.add(nid);
+              next.push(nid);
+              if (nid === targetId) { reachable = true; break; }
+            }
+          }
+          if (reachable) break;
+        }
+        frontier = next;
+        if (reachable) break;
+      }
+
+      if (!reachable) {
+        return socket.emit('error', { message: 'Target territory not within influence range' });
+      }
+
+      // Cost: player must have at least 3 total units to spare (1 in reserve)
+      const totalUnits = Object.values(state.territories)
+        .filter((t) => t.owner_id === userId)
+        .reduce((sum, t) => sum + t.unit_count, 0);
+      if (totalUnits < 4) {
+        return socket.emit('error', { message: 'Not enough units to pay influence cost (need 3 spare)' });
+      }
+
+      // Deduct 3 units from the largest owned adjacent territory
+      const adjacentOwned = (adjacency[targetId] ?? [])
+        .filter((nid) => state.territories[nid]?.owner_id === userId)
+        .sort((a, b) => (state.territories[b]?.unit_count ?? 0) - (state.territories[a]?.unit_count ?? 0));
+
+      if (adjacentOwned.length === 0) {
+        return socket.emit('error', { message: 'No adjacent owned territory to project influence from' });
+      }
+
+      let remaining = 3;
+      for (const tid of adjacentOwned) {
+        const t = state.territories[tid];
+        if (!t) continue;
+        const canSpend = Math.min(remaining, t.unit_count - 1);
+        t.unit_count -= canSpend;
+        remaining -= canSpend;
+        if (remaining <= 0) break;
+      }
+
+      if (remaining > 0) {
+        return socket.emit('error', { message: 'Not enough units in adjacent territories to pay influence cost' });
+      }
+
+      const previousOwner = target.owner_id;
+      target.owner_id = userId;
+      target.unit_count = 1;
+      state.influence_used_this_turn = true;
+
+      // Stability penalty on influenced territory
+      if (state.settings.stability_enabled) {
+        onInfluenceStabilityPenalty(state, targetId);
+      }
+
+      syncTerritoryCounts(state);
+
+      if (previousOwner) {
+        const prevPlayer = state.players.find((p) => p.player_id === previousOwner);
+        if (prevPlayer && prevPlayer.territory_count === 0) {
+          prevPlayer.is_eliminated = true;
+          currentPlayer.cards.push(...prevPlayer.cards);
+          prevPlayer.cards = [];
+          io.to(gameId).emit('game:player_eliminated', {
+            playerId: previousOwner,
+            eliminatorId: userId,
+            eliminatorName: currentPlayer.username,
+            eliminatedName: prevPlayer.username,
+          });
+        }
+      }
+
+      const influenceVictoryResult = checkVictory(state, map);
+      if (influenceVictoryResult) {
+        const { winnerId, condition } = influenceVictoryResult;
+        state.phase = 'game_over';
+        state.winner_id = winnerId;
+        state.victory_condition = condition;
+        finalizeGame(io, gameId, state, winnerId);
+      } else {
+        scheduleDebouncedSave(gameId);
+      }
+
+      socket.emit('game:influence_result', { targetId, previousOwner });
+      broadcastState(io, gameId, state);
+    });
+
+    // ── Event Card Choice ───────────────────────────────────────────────────
+    socket.on('game:event_choice', ({ gameId, choiceId }: { gameId: string; choiceId: string }) => {
+      const room = activeGames.get(gameId);
+      if (!room) return socket.emit('error', { message: 'Game not found' });
+      const { state } = room;
+
+      const currentPlayer = state.players[state.current_player_index];
+      if (currentPlayer.player_id !== userId) return socket.emit('error', { message: 'Not your turn' });
+
+      if (!state.active_event) return socket.emit('error', { message: 'No active event card' });
+      if (!state.active_event.choices?.length) return socket.emit('error', { message: 'This event has no choices' });
+
+      const ok = resolveEventChoice(state, state.active_event.card_id, choiceId);
+      if (!ok) return socket.emit('error', { message: 'Invalid choice' });
+
+      scheduleDebouncedSave(gameId);
+      io.to(gameId).emit('game:event_card_resolved', { cardId: state.active_event?.card_id ?? '' });
+      broadcastState(io, gameId, state);
+      // Restart turn timer now that the blocking event choice is resolved (human players only)
+      const roomAfterChoice = activeGames.get(gameId);
+      if (roomAfterChoice && !roomAfterChoice.state.players[roomAfterChoice.state.current_player_index].is_ai) {
+        startTurnTimer(io, gameId, roomAfterChoice.state, roomAfterChoice.map);
       }
     });
 
@@ -591,15 +1088,18 @@ export function initGameSocket(httpServer: HttpServer): Server {
       const currentPlayer = state.players[state.current_player_index];
       if (currentPlayer.player_id === userId) {
         advanceToNextPlayer(state, map);
+        broadcastEventCard(io, gameId, state, map);
         if (state.players[state.current_player_index].is_ai) {
           setTimeout(() => processAiTurn(io, gameId), 1500);
         }
       }
 
-      const winnerId = checkVictory(state);
-      if (winnerId) {
+      const resignVictoryResult = checkVictory(state, map);
+      if (resignVictoryResult) {
+        const { winnerId, condition } = resignVictoryResult;
         state.phase = 'game_over';
         state.winner_id = winnerId;
+        state.victory_condition = condition;
         await finalizeGame(io, gameId, state, winnerId);
       } else {
         await saveGameState(gameId, state);
@@ -672,6 +1172,36 @@ export async function shutdownGameSocket(io: Server): Promise<void> {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * After advanceToNextPlayer, if an event card was drawn, broadcast it and clear
+ * instant (no-choice) events. Choice-based events stay on state until resolved.
+ */
+function broadcastEventCard(io: Server, gameId: string, state: GameState, map: GameMap): void {
+  if (!state.active_event) return;
+  const card = { ...state.active_event };
+
+  // Attach result_summary when an instant effect was just applied
+  if (state.active_event_result) {
+    const result = state.active_event_result;
+    if (result.global) {
+      card.result_summary = [{ territory_id: '__global__', name: 'All territories', delta: -1 }];
+    } else if (result.affected_territories && result.affected_territories.length > 0) {
+      card.result_summary = result.affected_territories.map(({ territory_id, delta }) => ({
+        territory_id,
+        name: map.territories.find((t) => t.territory_id === territory_id)?.name ?? territory_id,
+        delta,
+      }));
+    }
+    state.active_event_result = undefined;
+  }
+
+  io.to(gameId).emit('game:event_card', card);
+  // If the card had no choices, the effect was already applied in advanceToNextPlayer — clear it
+  if (!card.choices || card.choices.length === 0) {
+    state.active_event = undefined;
+  }
+}
+
 function broadcastState(io: Server, gameId: string, state: GameState): void {
   const room = activeGames.get(gameId);
   if (!room) return;
@@ -690,7 +1220,14 @@ function broadcastState(io: Server, gameId: string, state: GameState): void {
 }
 
 function buildClientState(state: GameState, playerId: string | null, fogOfWar: boolean): GameState {
-  if (!fogOfWar || !playerId) return state;
+  const stripSecretMissions = (s: GameState): GameState => ({
+    ...s,
+    players: s.players.map((p) =>
+      playerId !== null && p.player_id === playerId ? p : { ...p, secret_mission: null },
+    ),
+  });
+
+  if (!fogOfWar || !playerId) return stripSecretMissions(state);
 
   // Build visible territory set
   const visibleIds = new Set<string>();
@@ -699,7 +1236,7 @@ function buildClientState(state: GameState, playerId: string | null, fogOfWar: b
   }
 
   // Add adjacent territories
-  const filtered = { ...state, territories: { ...state.territories } };
+  const filtered: GameState = { ...state, territories: { ...state.territories } };
   for (const [tid, tState] of Object.entries(state.territories)) {
     if (!visibleIds.has(tid)) {
       filtered.territories[tid] = { ...tState, unit_count: -1 }; // -1 = hidden
@@ -708,10 +1245,10 @@ function buildClientState(state: GameState, playerId: string | null, fogOfWar: b
 
   // Hide other players' cards
   filtered.players = state.players.map((p) =>
-    p.player_id === playerId ? p : { ...p, cards: [] }
+    p.player_id === playerId ? p : { ...p, cards: [] },
   );
 
-  return filtered;
+  return stripSecretMissions(filtered);
 }
 
 async function saveGameState(gameId: string, state: GameState): Promise<void> {
@@ -847,6 +1384,7 @@ async function finalizeGame(io: Server, gameId: string, state: GameState, winner
     is_ranked: resultCtx.isRanked,
     achievements_unlocked: unlockedByPlayer,
     xp_earned_by_player: resultCtx.xpEarnedByPlayer,
+    victory_condition: state.victory_condition,
   };
   io.to(gameId).emit('game:over', stats);
 
@@ -871,10 +1409,12 @@ async function processAiTurn(io: Server, gameId: string): Promise<void> {
   const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 600));
 
   const doVictoryCheck = async (): Promise<boolean> => {
-    const winnerId = checkVictory(state);
-    if (winnerId) {
+    const victoryResult = checkVictory(state, map);
+    if (victoryResult) {
+      const { winnerId, condition } = victoryResult;
       state.phase = 'game_over';
       state.winner_id = winnerId;
+      state.victory_condition = condition;
       aiInFlight.delete(gameId);
       await finalizeGame(io, gameId, state, winnerId);
       return true;
@@ -931,6 +1471,57 @@ async function processAiTurn(io: Server, gameId: string): Promise<void> {
     broadcastState(io, gameId, state);
   }
 
+  // ── AI Economy: build and research with accumulated resources ──────────
+  if (state.settings.economy_enabled || state.settings.tech_trees_enabled) {
+    const aiOwnedTerritoryIds = Object.keys(state.territories)
+      .filter((id) => state.territories[id].owner_id === currentPlayer.player_id)
+      .sort((a, b) => (state.territories[a].buildings?.length ?? 0) - (state.territories[b].buildings?.length ?? 0));
+
+    // Build one building per turn — production first, then tech gen, then defense
+    if (state.settings.economy_enabled) {
+      const AI_BUILD_PRIORITY: BuildingType[] = [
+        'production_1', 'tech_gen_1', 'defense_1',
+        'production_2', 'tech_gen_2', 'defense_2',
+        'production_3', 'defense_3',
+        'port', 'naval_base',
+      ];
+      let builtOne = false;
+      for (const bType of AI_BUILD_PRIORITY) {
+        if (builtOne) break;
+        for (const tId of aiOwnedTerritoryIds) {
+          const techUnlocked = (() => {
+            if (!state.settings.tech_trees_enabled) return true;
+            const eraTechTree = getEraTechTree(state.era);
+            const requiringNode = eraTechTree.find((node) => node.unlocks_building === bType);
+            if (!requiringNode) return true;
+            return (currentPlayer.unlocked_techs ?? []).includes(requiringNode.tech_id);
+          })();
+          const buildValidation = validateBuild(state, currentPlayer.player_id, tId, bType, techUnlocked);
+          if (buildValidation.valid) {
+            applyBuild(state, currentPlayer.player_id, tId, bType);
+            builtOne = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Research one technology per turn — cheapest affordable first
+    if (state.settings.tech_trees_enabled) {
+      const eraTechTree = getEraTechTree(state.era);
+      const sortedTechNodes = [...eraTechTree].sort((a, b) => (a.cost ?? Infinity) - (b.cost ?? Infinity));
+      for (const node of sortedTechNodes) {
+        const techValidation = validateResearch(state, currentPlayer.player_id, node.tech_id);
+        if (techValidation.valid && techValidation.node) {
+          applyResearch(state, currentPlayer.player_id, techValidation.node);
+          break;
+        }
+      }
+    }
+
+    broadcastState(io, gameId, state);
+  }
+
   // ── Attack Phase ───────────────────────────────────────────────────────
   state.draft_units_remaining = 0;
   state.phase = 'attack';
@@ -938,18 +1529,146 @@ async function processAiTurn(io: Server, gameId: string): Promise<void> {
 
   for (const action of actions) {
     if (action.type !== 'attack' || !action.from || !action.to) continue;
+
+    // ── AI influence action (sentinel from === '__influence__') ──
+    if (action.from === '__influence__') {
+      if (state.influence_used_this_turn) continue;
+      const modifiers = state.era_modifiers;
+      const canInfluence = modifiers?.influence_spread || modifiers?.carbonari_network;
+      if (!canInfluence) continue;
+
+      const target = state.territories[action.to];
+      if (!target || target.owner_id === currentPlayer.player_id) continue;
+
+      // Cost: need 3 spare units; deduct from adjacent owned territories
+      const adjacency: Record<string, string[]> = {};
+      for (const conn of map.connections) {
+        if (!adjacency[conn.from]) adjacency[conn.from] = [];
+        if (!adjacency[conn.to]) adjacency[conn.to] = [];
+        adjacency[conn.from].push(conn.to);
+        adjacency[conn.to].push(conn.from);
+      }
+
+      const totalUnits = Object.values(state.territories)
+        .filter((t) => t.owner_id === currentPlayer.player_id)
+        .reduce((sum, t) => sum + t.unit_count, 0);
+      if (totalUnits < 4) continue;
+
+      const adjacentOwned = (adjacency[action.to] ?? [])
+        .filter((nid) => state.territories[nid]?.owner_id === currentPlayer.player_id)
+        .sort((a, b) => (state.territories[b]?.unit_count ?? 0) - (state.territories[a]?.unit_count ?? 0));
+      if (adjacentOwned.length === 0) continue;
+
+      let remaining = 3;
+      for (const tid of adjacentOwned) {
+        const t = state.territories[tid];
+        if (!t) continue;
+        const canSpend = Math.min(remaining, t.unit_count - 1);
+        t.unit_count -= canSpend;
+        remaining -= canSpend;
+        if (remaining <= 0) break;
+      }
+      if (remaining > 0) continue;
+
+      const previousOwner = target.owner_id;
+      target.owner_id = currentPlayer.player_id;
+      target.unit_count = 1;
+      state.influence_used_this_turn = true;
+
+      // Stability penalty on AI influence capture
+      if (state.settings.stability_enabled) {
+        onInfluenceStabilityPenalty(state, action.to);
+      }
+
+      syncTerritoryCounts(state);
+
+      if (previousOwner) {
+        const prevPlayer = state.players.find((p) => p.player_id === previousOwner);
+        if (prevPlayer && prevPlayer.territory_count === 0) {
+          prevPlayer.is_eliminated = true;
+          currentPlayer.cards.push(...prevPlayer.cards);
+          prevPlayer.cards = [];
+          io.to(gameId).emit('game:player_eliminated', {
+            playerId: previousOwner,
+            eliminatorId: currentPlayer.player_id,
+            eliminatorName: currentPlayer.username,
+            eliminatedName: prevPlayer.username,
+          });
+        }
+      }
+
+      broadcastState(io, gameId, state);
+      if (await doVictoryCheck()) return;
+      continue;
+    }
+
     await delay();
     const from = state.territories[action.from];
     const to = state.territories[action.to];
     if (!from || !to || from.unit_count < 2 || from.owner_id !== currentPlayer.player_id) continue;
     if (to.owner_id === currentPlayer.player_id) continue;
 
+    // Naval sea-lane gating: AI must have a fleet to cross sea connections
+    if (state.settings.naval_enabled) {
+      const aiConnection = map.connections.find(
+        (c) => (c.from === action.from && c.to === action.to) || (c.from === action.to && c.to === action.from),
+      );
+      if (aiConnection?.type === 'sea') {
+        if (!from.naval_units || from.naval_units <= 0) continue;
+        const defenderFleets = to.naval_units ?? 0;
+        if (defenderFleets > 0) {
+          const aiNavalResult = resolveNavalCombat(from.naval_units, defenderFleets);
+          from.naval_units = Math.max(0, from.naval_units - aiNavalResult.attacker_losses);
+          to.naval_units = Math.max(0, defenderFleets - aiNavalResult.defender_losses);
+          io.to(gameId).emit('game:naval_combat_result', { fromId: action.from, toId: action.to, result: aiNavalResult });
+          if (!aiNavalResult.attacker_won) continue;
+        }
+        from.naval_units = Math.max(0, from.naval_units - 1);
+      }
+    }
+
     const aiDefenderId = to.owner_id;
+
+    // Combat modifier parity: apply same bonuses as human attack handler
+    const aiBuildingDefenseBonus = getBuildingDefenseBonus(state, action.to);
+    const aiTechDefenseBonus = state.settings.tech_trees_enabled
+      ? getPlayerDefenseBonus(state, aiDefenderId ?? '')
+      : 0;
+    const aiDefenderFaction = state.settings.factions_enabled
+      ? (() => {
+          const dp = state.players.find((p) => p.player_id === aiDefenderId);
+          return dp?.faction_id ? getEraFactions(state.era).find((f) => f.faction_id === dp.faction_id) : undefined;
+        })()
+      : undefined;
+    const aiFactionDefenseBonus = aiDefenderFaction?.passive_defense_bonus ?? 0;
+    const aiEventDefenseBonus = state.settings.events_enabled && aiDefenderId
+      ? getTemporaryModifierValue(state, aiDefenderId, 'defense_modifier')
+      : 0;
+    const aiTotalDefenseBonus = aiBuildingDefenseBonus + aiTechDefenseBonus + aiFactionDefenseBonus + aiEventDefenseBonus;
+    const aiDefenderDiceOverride = aiTotalDefenseBonus > 0
+      ? Math.min(to.unit_count, 2) + aiTotalDefenseBonus
+      : undefined;
+
+    const aiTechAttackBonus = state.settings.tech_trees_enabled
+      ? getPlayerAttackBonus(state, currentPlayer.player_id)
+      : 0;
+    const aiAttackerFaction = state.settings.factions_enabled && currentPlayer.faction_id
+      ? getEraFactions(state.era).find((f) => f.faction_id === currentPlayer.faction_id)
+      : undefined;
+    const aiFactionAttackBonus = aiAttackerFaction?.passive_attack_bonus ?? 0;
+    const aiEventAttackBonus = state.settings.events_enabled
+      ? getTemporaryModifierValue(state, currentPlayer.player_id, 'attack_modifier')
+      : 0;
+    const aiTotalAttackBonus = aiTechAttackBonus + aiFactionAttackBonus + aiEventAttackBonus;
+    const aiAttackerDiceOverride = aiTotalAttackBonus > 0
+      ? Math.min(from.unit_count - 1, 3) + aiTotalAttackBonus
+      : undefined;
+
     const result = resolveCombat(
       from.unit_count,
       to.unit_count,
-      undefined,
-      undefined,
+      aiAttackerDiceOverride,
+      aiDefenderDiceOverride,
       undefined,
       state.era_modifiers,
     );
@@ -960,6 +1679,11 @@ async function processAiTurn(io: Server, gameId: string): Promise<void> {
       to.unit_count = Math.min(from.unit_count - 1, 3);
       from.unit_count = Math.max(1, from.unit_count - to.unit_count);
       drawCard(state, currentPlayer.player_id);
+      // Raze buildings and apply stability penalty on AI capture
+      onTerritoryCapture(state, action.to);
+      if (state.settings.stability_enabled) {
+        onCaptureStabilityPenalty(state, action.to);
+      }
 
       const defenderPlayer = state.players.find((p) => p.player_id === aiDefenderId);
       if (defenderPlayer) {
@@ -1007,16 +1731,26 @@ async function processAiTurn(io: Server, gameId: string): Promise<void> {
   // ── End Turn ───────────────────────────────────────────────────────────
   advanceToNextPlayer(state, map);
   await saveGameState(gameId, state);
+  broadcastEventCard(io, gameId, state, map);
   broadcastState(io, gameId, state);
 
   aiInFlight.delete(gameId);
 
   if (await doVictoryCheck()) return;
 
+  // If there's an active event with choices and next player is AI, auto-resolve
+  if (state.active_event?.choices?.length && state.players[state.current_player_index].is_ai) {
+    const choice = state.active_event.choices[0];
+    resolveEventChoice(state, state.active_event.card_id, choice.choice_id);
+    io.to(gameId).emit('game:event_card_resolved', { cardId: '' });
+    broadcastState(io, gameId, state);
+  }
+
   // Chain if next player is also AI; otherwise restart turn timer for human
   if (state.players[state.current_player_index].is_ai) {
     setTimeout(() => processAiTurn(io, gameId), 1000);
-  } else {
+  } else if (!state.active_event?.choices?.length) {
+    // Don't start timer while a choice-based event awaits human resolution
     startTurnTimer(io, gameId, state, map);
   }
 }
@@ -1041,8 +1775,12 @@ function startTurnTimer(io: Server, gameId: string, state: GameState, map: GameM
 
     advanceToNextPlayer(room.state, room.map);
     await saveGameState(gameId, room.state);
+    broadcastEventCard(io, gameId, room.state, room.map);
     broadcastState(io, gameId, room.state);
-    startTurnTimer(io, gameId, room.state, room.map);
+    // Don't restart timer while a choice-based event is pending resolution
+    if (!room.state.active_event?.choices?.length) {
+      startTurnTimer(io, gameId, room.state, room.map);
+    }
 
     if (room.state.players[room.state.current_player_index].is_ai) {
       setTimeout(() => processAiTurn(io, gameId), 1500);

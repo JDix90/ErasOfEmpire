@@ -9,6 +9,8 @@ import GameMap from '../components/game/GameMap';
 import GlobeMap, { type GlobeEvent } from '../components/game/GlobeMap';
 import GameHUD from '../components/game/GameHUD';
 import TerritoryPanel from '../components/game/TerritoryPanel';
+import TechTreeModal, { type TechNode } from '../components/game/TechTreeModal';
+import EventCardModal, { type EventCard } from '../components/game/EventCardModal';
 import ActionModal, { ActionNotification, ModalData, NotificationData, ReinforcementEntry, FortifyEntry, GameOverModalData, EliminationModalData } from '../components/game/ActionModal';
 import TutorialOverlay, { TUTORIAL_STEPS } from '../components/game/TutorialOverlay';
 import InviteFriendsModal from '../components/game/InviteFriendsModal';
@@ -58,6 +60,23 @@ const VICTORY_LABELS: Record<string, string> = {
   capital: 'Capital',
   threshold: 'Threshold',
 };
+
+function formatVictorySummary(settings: GameLobbySettingsJson): string {
+  const raw =
+    Array.isArray(settings.allowed_victory_conditions) && settings.allowed_victory_conditions.length > 0
+      ? settings.allowed_victory_conditions
+      : typeof settings.victory_type === 'string'
+        ? [settings.victory_type]
+        : ['domination'];
+  const parts = raw.map((k) => VICTORY_LABELS[k] ?? k);
+  const th = settings.victory_threshold;
+  const hasTh = raw.includes('threshold') && typeof th === 'number' && Number.isFinite(th);
+  if (hasTh) {
+    const idx = parts.findIndex((_, i) => raw[i] === 'threshold');
+    if (idx >= 0) parts[idx] = `Threshold (${th}%)`;
+  }
+  return parts.join(', ');
+}
 
 function formatTurnTimer(seconds: unknown): string {
   const n = typeof seconds === 'number' ? seconds : Number(seconds);
@@ -113,6 +132,7 @@ export default function GamePage() {
     setSelectedTerritory,
     setAttackSource,
     setFortifyUnits,
+    setNavalSource,
   } = useUiStore();
 
   const [mapData, setMapData] = useState<MapData | null>(null);
@@ -168,6 +188,9 @@ export default function GamePage() {
   const [socketConnection, setSocketConnection] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
   const [lobbySnapshot, setLobbySnapshot] = useState<GameLobbySnapshot | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showTechTree, setShowTechTree] = useState(false);
+  const [techTree, setTechTree] = useState<TechNode[]>([]);
+  const [activeEventCard, setActiveEventCard] = useState<EventCard | null>(null);
 
   /** Map area is flex-sized; measure it so Globe/PIXI get real pixels when the viewport changes (devtools, rotate, resize). */
   const mapAreaRef = useRef<HTMLDivElement>(null);
@@ -505,6 +528,7 @@ export default function GamePage() {
       is_ranked?: boolean;
       achievements_unlocked?: Record<string, string[]>;
       xp_earned_by_player?: Record<string, number>;
+      victory_condition?: 'domination' | 'last_standing' | 'threshold' | 'capital' | 'secret_mission';
     }) => {
       const myId = userRef.current?.user_id;
       const xpEarned =
@@ -521,6 +545,7 @@ export default function GamePage() {
         is_ranked: stats.is_ranked,
         achievements_unlocked: myId && stats.achievements_unlocked ? stats.achievements_unlocked[myId] : undefined,
         xpEarned,
+        victory_condition: stats.victory_condition,
       };
       setModalQueue(q => [...q, gameOverData]);
     });
@@ -542,6 +567,52 @@ export default function GamePage() {
       toast(`${playerName} has surrendered!`, { icon: '🏳️', duration: 4000 });
     });
 
+    socket.on('game:build_result', ({ success, error }: { success: boolean; error?: string }) => {
+      if (!success) toast.error(error ?? 'Build failed');
+      else toast.success('Building constructed!', { duration: 2000 });
+    });
+
+    socket.on('game:research_result', ({ success, error, node }: { success: boolean; error?: string; node?: TechNode }) => {
+      if (!success) toast.error(error ?? 'Research failed');
+      else toast.success(`Researched: ${node?.name ?? 'technology'}`, { icon: '🔬', duration: 3000 });
+    });
+
+    socket.on('game:naval_combat_result', ({ fromId, toId, result }: {
+      fromId: string; toId: string;
+      result: { attacker_won: boolean; attacker_losses: number; defender_losses: number };
+    }) => {
+      const mapData = mapDataRef.current;
+      const fromName = mapData?.territories.find((t) => t.territory_id === fromId)?.name ?? fromId;
+      const toName = mapData?.territories.find((t) => t.territory_id === toId)?.name ?? toId;
+      const outcome = result.attacker_won
+        ? `Fleet victory — ${fromName} broke through to ${toName}`
+        : `Fleet repelled — defenders held ${toName}`;
+      toast(outcome, { icon: '⚓', duration: 3000 });
+      setCombatLog((prev) => [
+        ...prev,
+        `Naval: ${fromName} → ${toName}: ${result.attacker_won ? 'attacker won' : 'defender held'} (−${result.attacker_losses} / −${result.defender_losses} fleets)`,
+      ]);
+    });
+
+    socket.on('game:influence_result', ({ success, targetId, error }: { success: boolean; targetId?: string; error?: string }) => {
+      const mapData = mapDataRef.current;
+      const targetName = targetId ? (mapData?.territories.find((t) => t.territory_id === targetId)?.name ?? targetId) : 'territory';
+      if (success) {
+        toast.success(`📡 Influence succeeded — ${targetName} seized!`, { duration: 3000 });
+        setCombatLog((prev) => [...prev, `Influence: ${targetName} seized via influence spread`]);
+      } else {
+        toast.error(error ?? 'Influence failed');
+      }
+    });
+
+    socket.on('game:event_card', (card: EventCard) => {
+      setActiveEventCard(card);
+    });
+
+    socket.on('game:event_card_resolved', () => {
+      setActiveEventCard(null);
+    });
+
     socket.on('error', ({ message }: { message: string }) => {
       toast.error(message);
     });
@@ -560,6 +631,12 @@ export default function GamePage() {
       socket.off('game:chat_message');
       socket.off('game:player_eliminated');
       socket.off('game:player_resigned');
+      socket.off('game:build_result');
+      socket.off('game:research_result');
+      socket.off('game:naval_combat_result');
+      socket.off('game:influence_result');
+      socket.off('game:event_card');
+      socket.off('game:event_card_resolved');
       socket.off('error');
       // Notify server we left so it can schedule eviction / save state
       socket.emit('game:leave', { gameId });
@@ -743,23 +820,26 @@ export default function GamePage() {
 
       setAttackSource(null);
       setFortifyUnits(1);
+      setNavalSource(null);
       setSelectedTerritory(null);
       return;
     }
 
     setSelectedTerritory(territoryId);
-  }, [gameState, attackSource, user, gameId, showNotification, setFortifyUnits]);
+  }, [gameState, attackSource, user, gameId, showNotification, setFortifyUnits, setNavalSource]);
 
   const handleAdvancePhase = () => {
     getSocket().emit('game:advance_phase', { gameId });
     setSelectedTerritory(null);
     setAttackSource(null);
+    setNavalSource(null);
     setFortifyUnits(1);
   };
 
   const handleAttack = (fromId: string, toId: string) => {
     getSocket().emit('game:attack', { gameId, fromId, toId });
     setAttackSource(null);
+    setNavalSource(null);
     setFortifyUnits(1);
     setSelectedTerritory(null);
   };
@@ -800,6 +880,7 @@ export default function GamePage() {
     getSocket().emit('game:fortify', { gameId, fromId, toId, units });
     setSelectedTerritory(null);
     setAttackSource(null);
+    setNavalSource(null);
 
     const fromName = mapDataRef.current?.territories.find(t => t.territory_id === fromId)?.name ?? fromId;
     const toName = mapDataRef.current?.territories.find(t => t.territory_id === toId)?.name ?? toId;
@@ -826,6 +907,41 @@ export default function GamePage() {
   const handleRedeemCards = (cardIds: string[]) => {
     getSocket().emit('game:redeem_cards', { gameId, cardIds });
   };
+
+  const handleBuild = useCallback((buildingType: string) => {
+    if (!selectedTerritory) return;
+    getSocket().emit('game:build', { gameId, territoryId: selectedTerritory, buildingType });
+  }, [gameId, selectedTerritory]);
+
+  const handleResearchTech = useCallback((techId: string) => {
+    getSocket().emit('game:research_tech', { gameId, techId });
+  }, [gameId]);
+
+  const handleOpenTechTree = useCallback(async () => {
+    if (!gameState?.era) return;
+    if (techTree.length === 0) {
+      try {
+        const res = await api.get(`/eras/${gameState.era}/tech-tree`);
+        setTechTree(res.data.techTree ?? []);
+      } catch {
+        toast.error('Could not load tech tree');
+        return;
+      }
+    }
+    setShowTechTree(true);
+  }, [gameState?.era, techTree.length]);
+
+  const handleNavalMove = useCallback((fromId: string, toId: string, count: number) => {
+    getSocket().emit('game:naval_move', { gameId, fromId, toId, count });
+  }, [gameId]);
+
+  const handleNavalAttack = useCallback((fromId: string, toId: string) => {
+    getSocket().emit('game:naval_attack', { gameId, fromId, toId });
+  }, [gameId]);
+
+  const handleInfluence = useCallback((targetId: string) => {
+    getSocket().emit('game:influence', { gameId, targetId });
+  }, [gameId]);
 
   const handleResignRequest = () => {
     pushModal({ type: 'resign_confirm' });
@@ -898,10 +1014,7 @@ export default function GamePage() {
       lobby?.map_id && lobby?.era_id
         ? formatLobbyMapLabel(lobby.map_id, lobby.era_id)
         : '—';
-    const victoryType =
-      typeof settings.victory_type === 'string'
-        ? VICTORY_LABELS[settings.victory_type] ?? settings.victory_type
-        : '—';
+    const victorySummary = formatVictorySummary(settings);
 
     return (
       <div className="min-h-screen bg-cc-dark flex items-center justify-center p-4">
@@ -944,7 +1057,7 @@ export default function GamePage() {
                   </div>
                   <div>
                     <dt className="text-cc-muted text-xs">Victory</dt>
-                    <dd className="text-cc-text">{victoryType}</dd>
+                    <dd className="text-cc-text">{victorySummary}</dd>
                   </div>
                   <div>
                     <dt className="text-cc-muted text-xs">Starting units</dt>
@@ -1156,9 +1269,18 @@ export default function GamePage() {
               onAttack={handleAttack}
               onDraft={handleDraft}
               onFortify={handleFortify}
+              onBuild={gameState?.settings.economy_enabled ? handleBuild : undefined}
+              onNavalMove={gameState?.settings.naval_enabled ? handleNavalMove : undefined}
+              onNavalAttack={gameState?.settings.naval_enabled ? handleNavalAttack : undefined}
+              onInfluence={
+                (gameState?.era_modifiers?.influence_spread || gameState?.era_modifiers?.carbonari_network)
+                  ? handleInfluence
+                  : undefined
+              }
               onClose={() => {
                 setSelectedTerritory(null);
                 setAttackSource(null);
+                setNavalSource(null);
                 setFortifyUnits(1);
               }}
             />
@@ -1173,10 +1295,33 @@ export default function GamePage() {
           onRedeemCards={handleRedeemCards}
           onResign={handleResignRequest}
           onSaveAndLeave={handleSaveAndLeave}
+          onOpenTechTree={gameState?.settings.tech_trees_enabled ? handleOpenTechTree : undefined}
           lastCombatLog={combatLog}
           gameId={gameStarted && gameId ? gameId : undefined}
         />
       </div>
+
+      {/* Action Modal (blocking — combat results, turn summaries, game over, resign) */}
+      {showTechTree && user && gameState && (
+        <TechTreeModal
+          gameState={gameState}
+          currentPlayerId={user.user_id}
+          techTree={techTree}
+          onResearch={(techId) => { handleResearchTech(techId); }}
+          onClose={() => setShowTechTree(false)}
+        />
+      )}
+
+      {activeEventCard && gameState && user && (
+        <EventCardModal
+          card={activeEventCard}
+          isMyTurn={gameState.players[gameState.current_player_index]?.player_id === user.user_id}
+          onChoice={(choiceId) => {
+            getSocket().emit('game:event_choice', { gameId, choiceId });
+          }}
+          onDismiss={() => setActiveEventCard(null)}
+        />
+      )}
 
       {/* Action Modal (blocking — combat results, turn summaries, game over, resign) */}
       <ActionModal

@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useGameStore } from '../../store/gameStore';
+import { useGameStore, type PlayerState, type SecretMissionPayload } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
-import { Shield, Sword, ArrowRight, Clock, Users, CreditCard, Flag, Save } from 'lucide-react';
+import { Shield, Sword, ArrowRight, Clock, Users, CreditCard, Flag, Save, Zap } from 'lucide-react';
 import clsx from 'clsx';
 import { computeDraftPool } from '../../utils/draftPool';
 import GameChat from './GameChat';
+import EraModifierBadge from './EraModifierBadge';
 
 interface GameHUDProps {
   onAdvancePhase: () => void;
   onRedeemCards: (cardIds: string[]) => void;
   onResign?: () => void;
   onSaveAndLeave?: () => void;
+  onOpenTechTree?: () => void;
   lastCombatLog: string[];
   /** When set (in-progress game), chat renders at the bottom of this sidebar — never over the map. */
   gameId?: string;
@@ -29,11 +31,26 @@ const PHASE_ICONS: Record<string, React.ReactNode> = {
   fortify: <ArrowRight className="w-4 h-4" />,
 };
 
+function describeSecretMission(mission: SecretMissionPayload, players: PlayerState[]): string {
+  if (mission.kind === 'capture_territories' && mission.territory_ids) {
+    return `Own: ${mission.territory_ids.join(' & ')}`;
+  }
+  if (mission.kind === 'eliminate_player' && mission.target_player_id) {
+    const t = players.find((p) => p.player_id === mission.target_player_id);
+    return `Eliminate ${t?.username ?? mission.target_player_id}`;
+  }
+  if (mission.kind === 'control_regions' && mission.region_ids?.length) {
+    return `Control regions: ${mission.region_ids.join(', ')}`;
+  }
+  return 'Secret objective';
+}
+
 export default function GameHUD({
   onAdvancePhase,
   onRedeemCards,
   onResign,
   onSaveAndLeave,
+  onOpenTechTree,
   lastCombatLog,
   gameId,
 }: GameHUDProps) {
@@ -110,7 +127,60 @@ export default function GameHUD({
             {draftPool} units to place
           </p>
         )}
+        {/* Era modifier badges */}
+        <EraModifierBadge gameState={gameState} className="mt-2" />
       </div>
+
+      {myPlayer && (myPlayer.capital_territory_id || myPlayer.secret_mission) && (
+        <div className="px-4 py-3 border-b border-cc-border bg-cc-dark/40">
+          <h3 className="text-xs font-medium text-cc-muted uppercase tracking-wider mb-2">Objectives</h3>
+          {myPlayer.capital_territory_id && (
+            <p className="text-xs text-cc-text">
+              <span className="text-cc-muted">Your capital: </span>
+              <span className="font-mono">{myPlayer.capital_territory_id}</span>
+            </p>
+          )}
+          {myPlayer.secret_mission && (
+            <p className="text-xs text-cc-text mt-1">
+              <span className="text-cc-muted">Mission: </span>
+              {describeSecretMission(myPlayer.secret_mission, gameState.players)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Resources */}
+      {myPlayer && (gameState.settings.economy_enabled || gameState.settings.tech_trees_enabled) && (
+        <div className="px-4 py-3 border-b border-cc-border bg-cc-dark/40">
+          <h3 className="text-xs font-medium text-cc-muted uppercase tracking-wider mb-2">Resources</h3>
+          <div className="flex gap-3">
+            {gameState.settings.economy_enabled && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cc-dark border border-amber-800/40 text-amber-300 text-xs font-mono">
+                <span>⚙</span>
+                <span>{myPlayer.special_resource ?? 0} PP</span>
+              </div>
+            )}
+            {gameState.settings.tech_trees_enabled && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cc-dark border border-blue-800/40 text-blue-300 text-xs font-mono">
+                <span>⚡</span>
+                <span>{myPlayer.tech_points ?? 0} TP</span>
+              </div>
+            )}
+          </div>
+          {myPlayer.temporary_modifiers && myPlayer.temporary_modifiers.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {myPlayer.temporary_modifiers.map((mod, i) => (
+                <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-cc-dark border border-cc-border text-cc-muted">
+                  {mod.type === 'attack_modifier' && `+${mod.value} ATK`}
+                  {mod.type === 'defense_modifier' && `+${mod.value} DEF`}
+                  {mod.type === 'production_bonus' && `+${mod.value} PP`}
+                  {mod.turns_remaining != null && ` · ${mod.turns_remaining}t`}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Players List */}
       <div className="p-4 border-b border-cc-border">
@@ -258,6 +328,22 @@ export default function GameHUD({
       {/* Save & Leave / Resign */}
       {gameState.phase !== 'game_over' && myPlayer && !myPlayer.is_eliminated && (
         <div className="px-4 pb-3 flex flex-col gap-1.5">
+          {/* Tech tree shortcut */}
+          {onOpenTechTree && (
+            <button
+              onClick={onOpenTechTree}
+              className="w-full py-1.5 text-xs text-blue-300 hover:text-blue-200 transition-colors
+                         flex items-center justify-center gap-1.5 rounded border border-blue-800/40 hover:border-blue-600/60 bg-blue-900/20"
+            >
+              <Zap className="w-3 h-3" />
+              Tech Tree
+              {(myPlayer.tech_points ?? 0) > 0 && (
+                <span className="ml-1 px-1.5 rounded-full bg-blue-800 text-blue-200 font-mono">
+                  {myPlayer.tech_points} TP
+                </span>
+              )}
+            </button>
+          )}
           {onSaveAndLeave && (
             <button
               onClick={onSaveAndLeave}

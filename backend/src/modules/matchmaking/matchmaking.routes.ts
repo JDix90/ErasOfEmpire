@@ -63,7 +63,8 @@ async function createRankedGame(
   const gameId = uuidv4();
   const settings = {
     fog_of_war: false,
-    victory_type: 'domination',
+    allowed_victory_conditions: ['domination'] as const,
+    victory_type: 'domination' as const,
     turn_timer_seconds: BUCKET_SETTINGS[bucket].turn_timer_seconds,
     initial_unit_count: 3,
     card_set_escalating: true,

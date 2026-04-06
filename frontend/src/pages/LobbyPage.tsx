@@ -5,12 +5,39 @@ import { api } from '../services/api';
 import toast from 'react-hot-toast';
 import {
   Plus, LogOut, User, Map, Globe, Play, Clock, Trash2, Shield, Zap, Timer, GraduationCap, Bot,
-  Home, FileText, PenSquare, Users, Link2,
+  Home, FileText, PenSquare, Users, Link2, Info,
 } from 'lucide-react';
 import axios from 'axios';
 import { getSocketUrl } from '../config/env';
 import { io as ioClient, Socket as IOSocket } from 'socket.io-client';
 import { COMMUNITY_MAP_TITLES, ERA_LABELS } from '../constants/gameLobbyLabels';
+
+// ── Small tooltip component used in the game-creation form ─────────────────
+function FeatureTooltip({ text }: { text: string }) {
+  const [show, setShow] = React.useState(false);
+  return (
+    <span className="relative inline-flex items-center" style={{ verticalAlign: 'middle' }}>
+      <button
+        type="button"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)}
+        onBlur={() => setShow(false)}
+        className="text-cc-muted hover:text-cc-gold transition-colors focus:outline-none"
+        aria-label="More info"
+      >
+        <Info className="w-3.5 h-3.5" />
+      </button>
+      {show && (
+        <span className="absolute left-5 top-1/2 -translate-y-1/2 z-50 w-56 px-3 py-2 rounded-lg
+                         bg-cc-dark border border-cc-border text-xs text-cc-text leading-relaxed shadow-xl
+                         pointer-events-none">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 const ERAS = [
   { id: 'ancient',   label: 'Ancient World'   },
@@ -103,8 +130,19 @@ export default function LobbyPage() {
   const [aiDifficulty, setAiDifficulty] = useState('medium');
   const [fogOfWar, setFogOfWar] = useState(false);
   const [turnTimer, setTurnTimer] = useState(300);
+  type VictoryMode = 'domination' | 'threshold' | 'capital' | 'secret_mission';
+  const [victoryModes, setVictoryModes] = useState<Set<VictoryMode>>(
+    () => new Set<VictoryMode>(['domination']),
+  );
+  const [victoryThresholdPct, setVictoryThresholdPct] = useState(65);
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joiningByCode, setJoiningByCode] = useState(false);
+  const [factionsEnabled, setFactionsEnabled] = useState(false);
+  const [economyEnabled, setEconomyEnabled] = useState(false);
+  const [techTreesEnabled, setTechTreesEnabled] = useState(false);
+  const [eventsEnabled, setEventsEnabled] = useState(false);
+  const [navalEnabled, setNavalEnabled] = useState(false);
+  const [stabilityEnabled, setStabilityEnabled] = useState(false);
   const joinFromUrlHandled = useRef(false);
 
   const searchParamBootstrapDone = useRef(false);
@@ -236,26 +274,47 @@ export default function LobbyPage() {
     navigate('/');
   };
 
+  const toggleVictoryMode = (mode: VictoryMode) => {
+    setVictoryModes((prev) => {
+      const next = new Set(prev);
+      if (next.has(mode)) next.delete(mode);
+      else next.add(mode);
+      if (next.size === 0) next.add('domination');
+      return next;
+    });
+  };
+
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     try {
       const mapId = selectedCommunityMapId ?? ERA_MAP_IDS[selectedEra];
       const eraId = selectedCommunityMapId ? 'custom' : selectedEra;
+      const allowed = Array.from(victoryModes) as VictoryMode[];
+      const settings: Record<string, unknown> = {
+        fog_of_war: fogOfWar,
+        allowed_victory_conditions: allowed,
+        turn_timer_seconds: turnTimer,
+        initial_unit_count: 3,
+        card_set_escalating: true,
+        diplomacy_enabled: true,
+        factions_enabled: factionsEnabled || undefined,
+        economy_enabled: economyEnabled || undefined,
+        tech_trees_enabled: techTreesEnabled || undefined,
+        events_enabled: eventsEnabled || undefined,
+        naval_enabled: navalEnabled || undefined,
+        stability_enabled: stabilityEnabled || undefined,
+      };
+      if (allowed.includes('threshold')) {
+        settings.victory_threshold = victoryThresholdPct;
+      }
       const res = await api.post('/games', {
         era_id: eraId,
         map_id: mapId,
         max_players: 8,
         ai_count: aiCount,
         ai_difficulty: aiDifficulty,
-        settings: {
-          fog_of_war: fogOfWar,
-          victory_type: 'domination',
-          turn_timer_seconds: turnTimer,
-          initial_unit_count: 3,
-          card_set_escalating: true,
-          diplomacy_enabled: true,
-        },
+        settings,
       });
       toast.success('Game created!');
       navigate(`/game/${res.data.game_id}`);
@@ -659,6 +718,80 @@ export default function LobbyPage() {
                   className="w-4 h-4 accent-cc-gold"
                 />
                 <label htmlFor="fog" className="text-cc-text text-sm cursor-pointer">Enable Fog of War</label>
+              </div>
+              <div className="md:col-span-2 border-t border-cc-border pt-4 mt-2">
+                <label className="label mb-2">Advanced Features</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={factionsEnabled} onChange={(e) => setFactionsEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Asymmetric Factions
+                    <FeatureTooltip text="Each player or faction starts with a unique bonus — extra units, defensive perks, or special abilities tied to the era's major powers." />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={economyEnabled} onChange={(e) => setEconomyEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Economy &amp; Buildings
+                    <FeatureTooltip text="Territories generate Production Points each turn. Spend them to construct buildings (farms, forts, ports, labs) that boost income, defense, research, or naval power." />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={techTreesEnabled} onChange={(e) => setTechTreesEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Technology Trees
+                    <FeatureTooltip text="Earn Tech Points and research upgrades — improved combat dice, faster production, naval range, or era-specific breakthroughs — that compound advantages over time." />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={eventsEnabled} onChange={(e) => setEventsEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Historical Events
+                    <FeatureTooltip text="Era-specific event cards are drawn each turn — plagues, rebellions, trade booms, or political crises. Some affect all players; others let you choose a strategic response." />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={navalEnabled} onChange={(e) => setNavalEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Naval Warfare
+                    <FeatureTooltip text="Coastal territories can build and station fleets. Move fleets across sea connections to project power, blockade enemies, or launch amphibious attacks on distant shores." />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-cc-text cursor-pointer">
+                    <input type="checkbox" checked={stabilityEnabled} onChange={(e) => setStabilityEnabled(e.target.checked)} className="w-4 h-4 accent-cc-gold" />
+                    Population &amp; Stability
+                    <FeatureTooltip text="Each territory tracks stability (0–100%). Low stability reduces income and unit placement. Captured territories start unstable; neglected ones may rebel and lose units automatically." />
+                  </label>
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Victory conditions</label>
+                <p className="text-xs text-cc-muted mb-2">A player wins if they meet any checked condition (last player standing always wins).</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {([
+                    ['domination', 'Domination — control every territory', 'Own every single territory on the map simultaneously. A difficult but decisive conquest victory.'],
+                    ['threshold', 'Territory threshold', 'Win by controlling a set percentage of territories (configurable below). Rewards sustained expansion over total domination.'],
+                    ['capital', 'Capital — occupy all opponents\' capitals', 'Each player has a home capital. Capture every rival capital to win — even if they still hold other territories.'],
+                    ['secret_mission', 'Secret mission', 'Each player is secretly assigned a unique objective (e.g. control two specific regions, or eliminate a target player). Completing yours wins the game.'],
+                  ] as const).map(([id, label, tip]) => (
+                    <label key={id} className="flex items-start gap-2 text-sm text-cc-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 mt-0.5 accent-cc-gold shrink-0"
+                        checked={victoryModes.has(id)}
+                        onChange={() => toggleVictoryMode(id)}
+                      />
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        {label}
+                        <FeatureTooltip text={tip} />
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {victoryModes.has('threshold') && (
+                  <div className="mt-3 flex items-center gap-3">
+                    <label htmlFor="vthr" className="text-sm text-cc-muted whitespace-nowrap">Threshold %</label>
+                    <input
+                      id="vthr"
+                      type="number"
+                      min={1}
+                      max={99}
+                      className="input w-24 py-1.5"
+                      value={victoryThresholdPct}
+                      onChange={(e) => setVictoryThresholdPct(Number(e.target.value) || 65)}
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 items-end">
                 <button type="submit" className="btn-primary flex-1" disabled={creating}>

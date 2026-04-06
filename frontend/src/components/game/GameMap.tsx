@@ -53,6 +53,10 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
   const appRef = useRef<PIXI.Application | null>(null);
   const territoryGraphicsRef = useRef<Map<string, PIXI.Graphics>>(new Map());
   const labelContainerRef = useRef<PIXI.Container | null>(null);
+  const mapContainerRef = useRef<PIXI.Container | null>(null);
+  const capitalLayerRef = useRef<PIXI.Container | null>(null);
+  const buildingLayerRef = useRef<PIXI.Container | null>(null);
+  const buildingTextMapRef = useRef<Map<string, PIXI.Text>>(new Map());
   /** Pixi pointer handlers are registered once; keep latest parent callback without re-initing the canvas. */
   const onTerritoryClickRef = useRef(onTerritoryClick);
   onTerritoryClickRef.current = onTerritoryClick;
@@ -106,10 +110,17 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
     let stageStart = { x: 0, y: 0 };
 
     const mapContainer = new PIXI.Container();
+    mapContainerRef.current = mapContainer;
+    const capitalLayer = new PIXI.Container();
+    capitalLayerRef.current = capitalLayer;
     const labelContainer = new PIXI.Container();
     labelContainerRef.current = labelContainer;
+    const buildingLayer = new PIXI.Container();
+    buildingLayerRef.current = buildingLayer;
+    buildingTextMapRef.current.clear();
     stage.addChild(mapContainer);
     stage.addChild(labelContainer);
+    stage.addChild(buildingLayer);
 
     // Draw connections first (below territories)
     const connectionGraphics = new PIXI.Graphics();
@@ -164,6 +175,8 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
       labelContainer.addChild(label);
     }
 
+    mapContainer.addChild(capitalLayer);
+
     // Pan handling
     (app.view as HTMLCanvasElement).addEventListener('mousedown', (e) => {
       isDragging = true;
@@ -177,6 +190,8 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
       mapContainer.y = stageStart.y + (e.clientY - dragStart.y);
       labelContainer.x = mapContainer.x;
       labelContainer.y = mapContainer.y;
+      buildingLayer.x = mapContainer.x;
+      buildingLayer.y = mapContainer.y;
     });
 
     (app.view as HTMLCanvasElement).addEventListener('mouseup', () => { isDragging = false; });
@@ -188,14 +203,45 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
       const newScale = Math.max(0.3, Math.min(4, mapContainer.scale.x * zoomFactor));
       mapContainer.scale.set(newScale);
       labelContainer.scale.set(newScale);
+      buildingLayer.scale.set(newScale);
     });
 
     return () => {
       app.destroy(true);
       appRef.current = null;
+      mapContainerRef.current = null;
+      capitalLayerRef.current = null;
+      buildingLayerRef.current = null;
+      buildingTextMapRef.current.clear();
       territoryGraphicsRef.current.clear();
     };
   }, [mapData, canvasW, canvasH, width, height]);
+
+  // Capital markers (2D map)
+  useEffect(() => {
+    const layer = capitalLayerRef.current;
+    if (!layer || !gameState) return;
+    layer.removeChildren();
+    for (const player of gameState.players) {
+      const capId = player.capital_territory_id;
+      if (!capId) continue;
+      const territory = mapData.territories.find((t) => t.territory_id === capId);
+      if (!territory) continue;
+      const [cx, cy] = scalePolygon([territory.center_point], canvasW, canvasH, width, height)[0];
+      const g = new PIXI.Graphics();
+      const fill = hexToPixi(player.color);
+      g.lineStyle(2, 0xffd700, 1);
+      g.beginFill(fill, 0.95);
+      const s = 9;
+      g.moveTo(cx, cy - s);
+      g.lineTo(cx + s, cy);
+      g.lineTo(cx, cy + s);
+      g.lineTo(cx - s, cy);
+      g.closePath();
+      g.endFill();
+      layer.addChild(g);
+    }
+  }, [gameState, mapData, canvasW, canvasH, width, height]);
 
   // ── Update territory colors when game state changes ────────────────────────
   useEffect(() => {
@@ -226,6 +272,45 @@ export default function GameMap({ mapData, onTerritoryClick, width = 900, height
 
       const scaledPolygon = scalePolygon(territory.polygon as [number, number][], canvasW, canvasH, width, height);
       drawTerritory(g, scaledPolygon, fillColor, borderColor);
+    }
+
+    // ── Building icons ─────────────────────────────────────────────────────
+    const buildingLayer = buildingLayerRef.current;
+    if (buildingLayer) {
+      for (const territory of mapData.territories) {
+        const tState = gameState.territories[territory.territory_id];
+        const buildings = tState?.buildings ?? [];
+        const existing = buildingTextMapRef.current.get(territory.territory_id);
+
+        if (buildings.length === 0) {
+          if (existing) existing.visible = false;
+          continue;
+        }
+
+        const icons = buildings
+          .map((t: string) => {
+            if (t.includes('port') || t.includes('naval')) return '⚓';
+            if (t.includes('fort') || t.includes('wall') || t.includes('castle')) return '🛡';
+            if (t.includes('lab') || t.includes('acad') || t.includes('univ') || t.includes('research')) return '🔬';
+            if (t.includes('farm') || t.includes('mine') || t.includes('market') || t.includes('plantation')) return '⚙';
+            return '🏛';
+          })
+          .join('');
+
+        const [cx, cy] = scalePolygon([territory.center_point], canvasW, canvasH, width, height)[0];
+
+        if (existing) {
+          existing.text = icons;
+          existing.position.set(cx + 14, cy - 14);
+          existing.visible = true;
+        } else {
+          const txt = new PIXI.Text(icons, { fontSize: 9, align: 'left' });
+          txt.anchor.set(0, 0.5);
+          txt.position.set(cx + 14, cy - 14);
+          buildingLayer.addChild(txt);
+          buildingTextMapRef.current.set(territory.territory_id, txt);
+        }
+      }
     }
   }, [gameState, selectedTerritory, attackSource, mapData, canvasW, canvasH, width, height]);
 

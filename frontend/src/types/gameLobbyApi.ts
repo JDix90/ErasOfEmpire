@@ -16,10 +16,18 @@ export interface GameLobbySettingsJson {
   fog_of_war?: boolean;
   turn_timer_seconds?: number;
   victory_type?: string;
+  allowed_victory_conditions?: string[];
+  victory_threshold?: number;
   initial_unit_count?: number;
   card_set_escalating?: boolean;
   diplomacy_enabled?: boolean;
   tutorial?: boolean;
+  factions_enabled?: boolean;
+  economy_enabled?: boolean;
+  tech_trees_enabled?: boolean;
+  events_enabled?: boolean;
+  naval_enabled?: boolean;
+  stability_enabled?: boolean;
   [key: string]: unknown;
 }
 

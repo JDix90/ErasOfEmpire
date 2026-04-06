@@ -53,6 +53,8 @@ export interface GameOverModalData {
   achievements_unlocked?: string[];
   /** XP earned by the local player (from server `xp_earned_by_player`). */
   xpEarned?: number;
+  /** Which victory condition ended the game. */
+  victory_condition?: 'domination' | 'last_standing' | 'threshold' | 'capital' | 'secret_mission';
 }
 
 export interface EliminationModalData {
@@ -691,6 +693,19 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
   const sortedPlayers = [...data.players].sort((a, b) => b.territory_count - a.territory_count);
   const probHistory = data.win_probability_history;
 
+  const victoryReasonLabel = (condition: GameOverModalData['victory_condition']): string | null => {
+    switch (condition) {
+      case 'domination':    return 'Total Domination — all territories conquered';
+      case 'last_standing': return 'Last Commander Standing — all opponents eliminated';
+      case 'threshold':     return 'Territorial Threshold — controlling majority of the map';
+      case 'capital':       return 'Capital Conquest — all rival capitals seized';
+      case 'secret_mission':return 'Secret Mission completed';
+      default:              return null;
+    }
+  };
+
+  const reasonLabel = victoryReasonLabel(data.victory_condition);
+
   return (
     <div className="w-full min-w-0 text-center">
       {/* Trophy / Skull Animation */}
@@ -716,13 +731,26 @@ function GameOverView({ data, onDismiss }: { data: GameOverModalData; onDismiss:
         {data.isWinner ? 'Victory!' : 'Defeat'}
       </h2>
       <p className={clsx(
-        'text-white/50 text-sm mb-6 transition-all duration-500 delay-300',
+        'text-white/50 text-sm mb-3 transition-all duration-500 delay-300',
         showContent ? 'opacity-100' : 'opacity-0'
       )}>
         {data.isWinner
           ? 'You have conquered the world!'
           : `${data.winnerName} has won the game`}
       </p>
+
+      {/* Victory condition reason */}
+      {reasonLabel && (
+        <div className={clsx(
+          'mb-5 px-3 py-2 rounded-lg border text-xs font-medium transition-all duration-500 delay-350',
+          showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2',
+          data.isWinner
+            ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-300'
+            : 'bg-white/5 border-white/10 text-white/45'
+        )}>
+          {data.isWinner ? '🏆 ' : ''}Victory by {reasonLabel}
+        </div>
+      )}
 
       {data.xpEarned != null && data.xpEarned > 0 && (
         <p className="text-cc-gold/90 text-sm font-medium mb-4">+{data.xpEarned} XP</p>

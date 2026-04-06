@@ -9,6 +9,14 @@ export type { GamePhase, ConnectionType, MapConnectionEdge };
 export type EraId = 'ancient' | 'medieval' | 'discovery' | 'ww2' | 'coldwar' | 'modern' | 'acw' | 'risorgimento' | 'custom';
 export type GameStatus = 'waiting' | 'in_progress' | 'completed' | 'abandoned';
 export type VictoryType = 'domination' | 'secret_mission' | 'capital' | 'threshold';
+/** Victory condition that ended the game, including fallback for last-player-standing. */
+export type VictoryConditionKey = VictoryType | 'last_standing';
+
+/** Per-player hidden objective when secret_mission victory is enabled. */
+export type SecretMission =
+  | { kind: 'capture_territories'; territory_ids: [string, string] }
+  | { kind: 'eliminate_player'; target_player_id: string }
+  | { kind: 'control_regions'; region_ids: string[] };
 export type AiDifficulty = 'easy' | 'medium' | 'hard' | 'expert' | 'tutorial';
 export type DiplomacyStatus = 'neutral' | 'truce' | 'nap' | 'war';
 
@@ -54,6 +62,14 @@ export interface TerritoryState {
   owner_id: string | null;
   unit_count: number;
   unit_type: string;
+  /** Buildings constructed on this territory (economy feature). */
+  buildings?: BuildingType[];
+  /** Cached production income from buildings (refreshed each turn start). */
+  production_bonus?: number;
+  /** Fleet count stationed in this territory (naval warfare feature). */
+  naval_units?: number;
+  /** Stability rating 0-100 (population/stability feature). */
+  stability?: number;
 }
 
 export interface PlayerState {
@@ -67,6 +83,22 @@ export interface PlayerState {
   territory_count: number;
   cards: TerritoryCard[];
   mmr: number;
+  /** Set when capital victory is allowed; lexicographically first owned territory at init. */
+  capital_territory_id: string | null;
+  /** Hidden from other clients via buildClientState when secret_mission mode is on. */
+  secret_mission: SecretMission | null;
+  /** Faction chosen at game start (maps to an era faction definition). */
+  faction_id?: string;
+  /** Accumulated technology points (economy feature). */
+  tech_points?: number;
+  /** Special/strategic resource count for era abilities. */
+  special_resource?: number;
+  /** Tech node IDs that have been researched. */
+  unlocked_techs?: string[];
+  /** Per-ability use count this turn (keyed by ability_id). */
+  ability_uses?: Record<string, number>;
+  /** Active temporary modifiers from event cards (diminishes each turn). */
+  temporary_modifiers?: TemporaryModifier[];
 }
 
 export interface DiplomacyEntry {
@@ -84,8 +116,11 @@ export interface TerritoryCard {
 
 export interface GameSettings {
   fog_of_war: boolean;
-  victory_type: VictoryType;
-  victory_threshold?: number;    // for 'threshold' mode
+  /** @deprecated Prefer allowed_victory_conditions; kept for legacy DB rows. */
+  victory_type?: VictoryType;
+  /** OR semantics: a player wins if they satisfy any listed condition (plus universal elimination). */
+  allowed_victory_conditions?: VictoryType[];
+  victory_threshold?: number;    // for 'threshold' mode (1–99 %)
   turn_timer_seconds: number;    // 0 = no timer
   initial_unit_count: number;
   card_set_escalating: boolean;
@@ -94,16 +129,48 @@ export interface GameSettings {
   tutorial_step?: number;
   /** When true, turn notifications use email (requires SMTP). */
   async_mode?: boolean;
+  /** Enable asymmetric faction starting positions (Phase B). */
+  factions_enabled?: boolean;
+  /** Enable territory economy layer: buildings, production, resource income (Phase C). */
+  economy_enabled?: boolean;
+  /** Enable per-era technology trees (Phase D). */
+  tech_trees_enabled?: boolean;
+  /** Enable era-specific event cards that fire each game round. */
+  events_enabled?: boolean;
+  /** Enable naval warfare: fleets, ports, sea-lane gating. */
+  naval_enabled?: boolean;
+  /** Enable population stability mechanics. */
+  stability_enabled?: boolean;
 }
 
-/** Optional per-era combat / economy tweaks (see implementation plan Step 08). */
+/** Optional per-era combat / economy tweaks. */
 export interface EraModifiers {
+  // Ancient
   legion_reroll?: boolean;
+  // Medieval
   castle_fortification?: boolean;
+  // Discovery
   sea_lanes?: boolean;
+  // WW2
   wartime_logistics?: boolean;
+  // Cold War
   influence_spread?: boolean;
+  influence_range?: number;         // hop limit for influence_spread (default 1)
+  // Modern
+  precision_strike?: boolean;
+  // ACW
+  rifle_doctrine?: boolean;
+  // Risorgimento
+  carbonari_network?: boolean;
 }
+
+/** Building tiers: production (income), defense (dice/fortify), tech generation, and era specials. */
+export type BuildingType =
+  | 'production_1' | 'production_2' | 'production_3'
+  | 'defense_1' | 'defense_2' | 'defense_3'
+  | 'tech_gen_1' | 'tech_gen_2'
+  | 'special_a' | 'special_b'
+  | 'port' | 'naval_base';
 
 /** Snapshots for end-of-game win-probability chart (territory + army blend, renormalized). */
 export interface WinProbabilitySnapshot {
@@ -128,8 +195,76 @@ export interface GameState {
   draft_units_remaining: number;
   turn_started_at: number;       // Unix timestamp ms
   winner_id?: string;
+  /** Which victory condition triggered the win. */
+  victory_condition?: VictoryConditionKey;
   win_probability_history?: WinProbabilitySnapshot[];
   era_modifiers?: EraModifiers;
+  /** Number of fortify moves used this turn (limit enforced by wartime_logistics). */
+  fortify_moves_used?: number;
+  /** Whether the Cold War influence ability has been used this turn. */
+  influence_used_this_turn?: boolean;
+  /** Whether a Blitzkrieg (WW2) bonus attack has been used this turn. */
+  blitzkrieg_attacked?: boolean;
+  /** Currently active event card awaiting resolution (events feature). */
+  active_event?: EventCard;
+  /** Transient: result of last instant event effect application (cleared after broadcast). */
+  active_event_result?: EventEffectResult;
+}
+
+// ── Event Cards ───────────────────────────────────────────────────────────────
+export type EventEffectType =
+  | 'units_added'
+  | 'units_removed'
+  | 'production_bonus'
+  | 'attack_modifier'
+  | 'defense_modifier'
+  | 'truce'
+  | 'region_disaster';
+
+export type EventCategory = 'global' | 'regional' | 'player_targeted' | 'natural_disaster';
+
+export interface EventEffect {
+  type: EventEffectType;
+  target: 'player' | 'territory' | 'region';
+  value: number;
+  /** Specific territory or region ID when target is 'territory' or 'region'. */
+  target_id?: string;
+  /** How many turns this modifier persists (omit for instant effects). */
+  duration_turns?: number;
+}
+
+/** Structured summary of what applyEventEffect actually did. */
+export interface EventEffectResult {
+  affected_territories?: Array<{ territory_id: string; delta: number }>;
+  global?: boolean; // region_disaster touched all territories
+}
+
+export interface EventChoice {
+  choice_id: string;
+  label: string;
+  effect: EventEffect;
+}
+
+export interface EventCard {
+  card_id: string;
+  title: string;
+  description: string;
+  category: EventCategory;
+  era_id: EraId;
+  /** Instant effect (applied immediately if no choices). */
+  effect?: EventEffect;
+  /** If present, player must choose one option. */
+  choices?: EventChoice[];
+  /** When true, all players see the card (not just the current player). */
+  affects_all_players?: boolean;
+  /** Populated server-side after applying an instant effect — carries result details for the UI. */
+  result_summary?: Array<{ territory_id: string; name: string; delta: number }>;
+}
+
+export interface TemporaryModifier {
+  type: EventEffectType;
+  value: number;
+  turns_remaining: number;
 }
 
 // ── Combat ────────────────────────────────────────────────────────────────────

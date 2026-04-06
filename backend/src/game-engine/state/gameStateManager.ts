@@ -2,16 +2,33 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
   GameState, PlayerState, TerritoryState, TerritoryCard,
   GameMap, GameSettings, EraId, DiplomacyEntry, WinProbabilitySnapshot,
-  EraModifiers,
+  EraModifiers, VictoryConditionKey,
 } from '../../types';
+import { getEraFactions } from '../eras';
 import { calculateReinforcements, getCardSetBonus } from '../combat/combatResolver';
+import { getAllowedVictoryConditions, normalizeGameSettings } from './gameSettings';
+import { collectProduction } from './economyManager';
+import { applyTechPointIncome, getPlayerReinforceBonus } from './techManager';
+import { getEraDeck, drawRandomCard, applyEventEffect, tickTemporaryModifiers } from '../events/eventCardManager';
+import { initializeNavalUnits, collectFleetIncome } from './navalManager';
+import { initializeStability, applyStabilityTick } from './stabilityManager';
+import {
+  assignCapitals,
+  assignSecretMissions,
+  createSeededRng,
+  hashStringToSeed,
+  isMissionComplete,
+} from '../victory/missions';
 
 const ERA_DEFAULTS: Partial<Record<EraId, EraModifiers>> = {
-  ancient: { legion_reroll: true },
-  medieval: { castle_fortification: true },
-  discovery: { sea_lanes: true },
-  ww2: { wartime_logistics: true },
-  coldwar: { influence_spread: true },
+  ancient:      { legion_reroll: true },
+  medieval:     { castle_fortification: true },
+  discovery:    { sea_lanes: true },
+  ww2:          { wartime_logistics: true },
+  coldwar:      { influence_spread: true, influence_range: 1 },
+  modern:       { precision_strike: true },
+  acw:          { rifle_doctrine: true },
+  risorgimento: { carbonari_network: true, influence_range: 1 },
 };
 
 /**
@@ -21,9 +38,10 @@ export function initializeGameState(
   gameId: string,
   era: EraId,
   map: GameMap,
-  players: Omit<PlayerState, 'territory_count' | 'cards'>[],
+  players: Omit<PlayerState, 'territory_count' | 'cards' | 'capital_territory_id' | 'secret_mission'>[],
   settings: GameSettings
 ): GameState {
+  const settingsNorm = normalizeGameSettings(settings);
   const territories: Record<string, TerritoryState> = {};
 
   // Build territory state — all unowned initially
@@ -36,14 +54,28 @@ export function initializeGameState(
     };
   }
 
-  // Randomly distribute territories among players
+  // Assign factions to players (round-robin from available era factions) when enabled
+  if (settingsNorm.factions_enabled) {
+    const eraFactions = getEraFactions(era);
+    players.forEach((p, idx) => {
+      if (!p.faction_id) {
+        p.faction_id = eraFactions[idx % eraFactions.length]?.faction_id ?? null;
+      }
+    });
+  }
+
+  // Distribute territories — geographic clustering when factions_enabled, otherwise random
   const territoryIds = Object.keys(territories);
-  const shuffled = shuffleArray([...territoryIds]);
-  shuffled.forEach((tid, idx) => {
-    const playerIndex = idx % players.length;
-    territories[tid].owner_id = players[playerIndex].player_id;
-    territories[tid].unit_count = settings.initial_unit_count;
-  });
+  if (settingsNorm.factions_enabled) {
+    distributeTerritoriesGeographic(territories, map, players, era, settingsNorm.initial_unit_count);
+  } else {
+    const shuffled = shuffleArray([...territoryIds]);
+    shuffled.forEach((tid, idx) => {
+      const playerIndex = idx % players.length;
+      territories[tid].owner_id = players[playerIndex].player_id;
+      territories[tid].unit_count = settingsNorm.initial_unit_count;
+    });
+  }
 
   // Build card deck
   const cardDeck = buildCardDeck(map.territories.map((t) => t.territory_id));
@@ -65,7 +97,21 @@ export function initializeGameState(
     ...p,
     territory_count: Object.values(territories).filter((t) => t.owner_id === p.player_id).length,
     cards: [],
+    capital_territory_id: null,
+    secret_mission: null,
+    // Economy / tech initial values
+    tech_points: settingsNorm.tech_trees_enabled ? 0 : undefined,
+    special_resource: (settingsNorm.tech_trees_enabled || settingsNorm.economy_enabled) ? 0 : undefined,
+    unlocked_techs: [],
+    ability_uses: {},
   }));
+
+  // Initialize buildings array on territories when economy is enabled
+  if (settingsNorm.economy_enabled) {
+    for (const t of Object.values(territories)) {
+      t.buildings = [];
+    }
+  }
 
   const firstPlayer = playerStates[0];
   const continentBonus = calculateContinentBonusesForPlayer(territories, map, firstPlayer.player_id);
@@ -87,14 +133,72 @@ export function initializeGameState(
     card_deck: cardDeck,
     card_set_redemption_count: 0,
     diplomacy,
-    settings,
+    settings: settingsNorm,
     draft_units_remaining: initialDraft,
     turn_started_at: Date.now(),
     win_probability_history: [],
     era_modifiers: { ...(ERA_DEFAULTS[era] ?? {}) },
+    fortify_moves_used: 0,
+    influence_used_this_turn: false,
+    blitzkrieg_attacked: false,
   };
+
+  const allowed = getAllowedVictoryConditions(settingsNorm);
+  if (allowed.includes('capital')) {
+    assignCapitals(state);
+  }
+  if (allowed.includes('secret_mission')) {
+    const seed = hashStringToSeed(`${gameId}:secret_missions`);
+    assignSecretMissions(state, map, createSeededRng(seed));
+  }
+
+  // Initialize naval units on coastal territories when naval warfare is enabled
+  if (settingsNorm.naval_enabled) {
+    initializeNavalUnits(state, map);
+  }
+
+  // Initialize stability values when stability feature is enabled
+  if (settingsNorm.stability_enabled) {
+    initializeStability(state);
+  }
+
   appendWinProbabilitySnapshot(state);
   return state;
+}
+
+/**
+ * Patch older `state_json` rows (missing fields) and normalize settings.
+ * Optionally pass `map` to backfill capitals when legacy rows omit them.
+ */
+export function repairLegacyGameState(state: GameState, map?: GameMap): void {
+  state.settings = normalizeGameSettings(state.settings);
+  for (const p of state.players) {
+    if (p.capital_territory_id === undefined) p.capital_territory_id = null;
+    if (p.secret_mission === undefined) p.secret_mission = null;
+    if (p.tech_points === undefined && state.settings.tech_trees_enabled) p.tech_points = 0;
+    if (p.special_resource === undefined && state.settings.tech_trees_enabled) p.special_resource = 0;
+    if (p.unlocked_techs === undefined) p.unlocked_techs = [];
+    if (p.ability_uses === undefined) p.ability_uses = {};
+  }
+  // Patch missing per-turn fields on GameState
+  if (state.fortify_moves_used === undefined) state.fortify_moves_used = 0;
+  if (state.influence_used_this_turn === undefined) state.influence_used_this_turn = false;
+  if (state.blitzkrieg_attacked === undefined) state.blitzkrieg_attacked = false;
+  // Patch era_modifiers to ensure new eras have defaults applied
+  if (!state.era_modifiers && state.era) {
+    state.era_modifiers = { ...(ERA_DEFAULTS[state.era] ?? {}) };
+  }
+  // Patch buildings field on territories
+  if (state.settings.economy_enabled) {
+    for (const t of Object.values(state.territories)) {
+      if (t.buildings === undefined) t.buildings = [];
+    }
+  }
+  const allowed = getAllowedVictoryConditions(state.settings);
+  if (map && allowed.includes('capital')) {
+    const missing = state.players.some((p) => !p.capital_territory_id);
+    if (missing) assignCapitals(state);
+  }
 }
 
 /**
@@ -227,6 +331,21 @@ export function advanceToNextPlayer(state: GameState, map?: GameMap): void {
   }
   if (next <= state.current_player_index) {
     state.turn_number++;
+
+    // Draw an event card at the start of each new round
+    if (state.settings.events_enabled) {
+      const deck = getEraDeck(state.era);
+      const card = drawRandomCard(deck);
+      if (card) {
+        if (card.choices && card.choices.length > 0) {
+          // Card requires a choice — store it for the next player to resolve
+          state.active_event = card;
+        } else if (card.effect) {
+          // Instant effect — apply immediately (current player context will be the next player)
+          state.active_event = card; // temporarily set so applyEventEffect uses correct player
+        }
+      }
+    }
   }
   state.current_player_index = next;
   state.phase = 'draft';
@@ -235,11 +354,12 @@ export function advanceToNextPlayer(state: GameState, map?: GameMap): void {
   const nextPlayer = state.players[next];
   if (map) {
     const bonus = calculateContinentBonusesForPlayer(state.territories, map, nextPlayer.player_id);
+    const passiveReinforceBonus = getPlayerReinforceBonus(state, nextPlayer.player_id);
     state.draft_units_remaining = calculateReinforcements(
       nextPlayer.territory_count,
       bonus,
       state.players.length,
-    );
+    ) + passiveReinforceBonus;
   } else {
     state.draft_units_remaining = calculateReinforcements(
       nextPlayer.territory_count,
@@ -249,6 +369,44 @@ export function advanceToNextPlayer(state: GameState, map?: GameMap): void {
   }
 
   appendWinProbabilitySnapshot(state);
+
+  // Collect production income and tech point income for the next player
+  if (state.settings.economy_enabled) {
+    collectProduction(state, nextPlayer.player_id);
+  }
+  if (state.settings.tech_trees_enabled) {
+    applyTechPointIncome(state, nextPlayer.player_id);
+  }
+
+  // Collect fleet income from ports / naval bases
+  if (state.settings.naval_enabled) {
+    collectFleetIncome(state, nextPlayer.player_id);
+  }
+
+  // Apply stability recovery tick
+  if (state.settings.stability_enabled) {
+    applyStabilityTick(state, nextPlayer.player_id);
+  }
+
+  // Tick temporary modifiers from event cards
+  if (state.settings.events_enabled) {
+    tickTemporaryModifiers(state, nextPlayer.player_id);
+    // Apply instant event cards now (current_player_index is set to next player)
+    if (state.active_event && (!state.active_event.choices || state.active_event.choices.length === 0) && state.active_event.effect) {
+      const effectResult = applyEventEffect(state, state.active_event.effect);
+      state.active_event_result = effectResult;
+      // Leave active_event set so the socket layer can broadcast it, then clear it there
+    }
+  }
+
+  // Reset per-turn ability flags
+  state.fortify_moves_used = 0;
+  state.influence_used_this_turn = false;
+  state.blitzkrieg_attacked = false;
+  // Reset per-player per-turn ability use counts
+  for (const player of state.players) {
+    player.ability_uses = {};
+  }
 
   // Decrement truce timers
   for (const entry of state.diplomacy) {
@@ -311,26 +469,85 @@ export function repairDraftUnitsIfMissing(state: GameState, map: GameMap): void 
 }
 
 /**
- * Check if the game has a winner based on the configured victory condition.
+ * Tie-break when multiple players satisfy a victory condition in the same update:
+ * prefer the current turn holder, else lowest player_index.
  */
-export function checkVictory(state: GameState): string | null {
-  const activePlayers = state.players.filter((p) => !p.is_eliminated);
-  if (activePlayers.length === 1) return activePlayers[0].player_id;
-
-  // Domination: if one player owns every territory, they win
-  const totalTerritories = Object.keys(state.territories).length;
-  for (const player of activePlayers) {
-    if (player.territory_count >= totalTerritories) return player.player_id;
-  }
-
-  if (state.settings.victory_type === 'threshold' && state.settings.victory_threshold) {
-    const threshold = Math.ceil(totalTerritories * (state.settings.victory_threshold / 100));
-    for (const player of activePlayers) {
-      if (player.territory_count >= threshold) return player.player_id;
+function pickWinnerAmong(candidates: string[], state: GameState): string | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!;
+  const current = state.players[state.current_player_index]?.player_id;
+  if (current && candidates.includes(current)) return current;
+  let best: string | null = null;
+  let bestIdx = Infinity;
+  for (const id of candidates) {
+    const p = state.players.find((x) => x.player_id === id);
+    if (p && p.player_index < bestIdx) {
+      bestIdx = p.player_index;
+      best = id;
     }
   }
+  return best;
+}
 
-  return null;
+function playerSatisfiesCapitalVictory(state: GameState, playerId: string): boolean {
+  const p = state.players.find((x) => x.player_id === playerId);
+  if (!p || p.is_eliminated || !p.capital_territory_id) return false;
+  if (state.territories[p.capital_territory_id]?.owner_id !== playerId) return false;
+  const others = state.players.filter((o) => !o.is_eliminated && o.player_id !== playerId);
+  for (const o of others) {
+    if (!o.capital_territory_id) return false;
+    if (state.territories[o.capital_territory_id]?.owner_id !== playerId) return false;
+  }
+  return true;
+}
+
+/**
+ * Check if the game has a winner based on configured victory conditions (OR semantics).
+ */
+export function checkVictory(state: GameState, map: GameMap): { winnerId: string; condition: VictoryConditionKey } | null {
+  const activePlayers = state.players.filter((p) => !p.is_eliminated);
+  if (activePlayers.length === 1) return { winnerId: activePlayers[0].player_id, condition: 'last_standing' };
+
+  const settings = normalizeGameSettings(state.settings);
+  const allowed = getAllowedVictoryConditions(settings);
+  const totalTerritories = Object.keys(state.territories).length;
+  const winners: Array<{ winnerId: string; condition: VictoryConditionKey }> = [];
+
+  for (const player of activePlayers) {
+    let condition: VictoryConditionKey | null = null;
+
+    if (allowed.includes('domination') && player.territory_count >= totalTerritories) {
+      condition = 'domination';
+    }
+
+    if (
+      condition == null &&
+      allowed.includes('threshold') &&
+      settings.victory_threshold != null
+    ) {
+      const need = Math.ceil(totalTerritories * (settings.victory_threshold / 100));
+      if (player.territory_count >= need) condition = 'threshold';
+    }
+
+    if (condition == null && allowed.includes('capital')) {
+      if (playerSatisfiesCapitalVictory(state, player.player_id)) condition = 'capital';
+    }
+
+    if (condition == null && allowed.includes('secret_mission') && player.secret_mission) {
+      if (isMissionComplete(state, map, player)) condition = 'secret_mission';
+    }
+
+    if (condition != null) winners.push({ winnerId: player.player_id, condition });
+  }
+
+  if (winners.length === 0) return null;
+  if (winners.length === 1) return winners[0];
+
+  // Tiebreak: most territories wins
+  const result = pickWinnerAmong(winners.map((w) => w.winnerId), state);
+  if (!result) return null;
+  const winner = winners.find((w) => w.winnerId === result);
+  return winner ?? null;
 }
 
 /**
@@ -426,3 +643,84 @@ function shuffleArray<T>(arr: T[]): T[] {
   }
   return arr;
 }
+
+/**
+ * Geographic territory distribution for faction-enabled games.
+ *
+ * Algorithm:
+ * 1. Each player has a faction (via player.faction_id); look up that faction's
+ *    home_region_ids from ERA_FACTIONS.
+ * 2. BFS-expand from home territories outward, assigning each wave to the
+ *    nearest-home-region player.  Ties broken by player index.
+ * 3. Any leftover territories are distributed round-robin.
+ */
+function distributeTerritoriesGeographic(
+  territories: Record<string, TerritoryState>,
+  map: GameMap,
+  players: Omit<PlayerState, 'territory_count' | 'cards' | 'capital_territory_id' | 'secret_mission'>[],
+  era: EraId,
+  initialUnitCount: number
+): void {
+  const factions = getEraFactions(era);
+
+  // Build adjacency map
+  const adjacency: Record<string, string[]> = {};
+  for (const conn of map.connections) {
+    if (!adjacency[conn.from]) adjacency[conn.from] = [];
+    if (!adjacency[conn.to]) adjacency[conn.to] = [];
+    adjacency[conn.from].push(conn.to);
+    adjacency[conn.to].push(conn.from);
+  }
+
+  // For each player, find their home territories from their faction
+  const playerHomeIds: string[][] = players.map((p) => {
+    if (!p.faction_id) return [];
+    const faction = factions.find((f) => f.faction_id === p.faction_id);
+    if (!faction) return [];
+    return map.territories
+      .filter((t) => faction.home_region_ids.includes(t.region_id))
+      .map((t) => t.territory_id);
+  });
+
+  // Assign home territories first
+  const assigned = new Map<string, string>(); // territory_id → player_id
+  for (let pi = 0; pi < players.length; pi++) {
+    for (const tid of playerHomeIds[pi]) {
+      if (!assigned.has(tid)) {
+        assigned.set(tid, players[pi].player_id);
+      }
+    }
+  }
+
+  // BFS expansion: each player expands from their owned territories simultaneously
+  const unassigned = new Set(Object.keys(territories).filter((tid) => !assigned.has(tid)));
+  if (unassigned.size > 0) {
+    // Multi-source BFS — each player expands one step at a time
+    let changed = true;
+    while (changed && unassigned.size > 0) {
+      changed = false;
+      for (const [tid, playerId] of [...assigned.entries()]) {
+        for (const nid of (adjacency[tid] ?? [])) {
+          if (unassigned.has(nid)) {
+            assigned.set(nid, playerId);
+            unassigned.delete(nid);
+            changed = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Round-robin any truly isolated leftover territories
+  const remaining = [...unassigned];
+  remaining.forEach((tid, idx) => {
+    assigned.set(tid, players[idx % players.length].player_id);
+  });
+
+  // Apply assignments to territories
+  for (const [tid, playerId] of assigned.entries()) {
+    territories[tid].owner_id = playerId;
+    territories[tid].unit_count = initialUnitCount;
+  }
+}
+

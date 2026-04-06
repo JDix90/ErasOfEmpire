@@ -7,6 +7,17 @@ export interface TerritoryState {
   owner_id: string | null;
   unit_count: number;
   unit_type: string;
+  buildings?: string[];
+  production_bonus?: number;
+  naval_units?: number;
+  stability?: number;
+}
+
+export interface SecretMissionPayload {
+  kind: 'capture_territories' | 'eliminate_player' | 'control_regions';
+  territory_ids?: [string, string];
+  target_player_id?: string;
+  region_ids?: string[];
 }
 
 export interface PlayerState {
@@ -19,6 +30,13 @@ export interface PlayerState {
   territory_count: number;
   cards: { card_id: string; symbol: string }[];
   mmr: number;
+  capital_territory_id?: string | null;
+  secret_mission?: SecretMissionPayload | null;
+  faction_id?: string | null;
+  tech_points?: number;
+  unlocked_techs?: string[];
+  special_resource?: number;
+  temporary_modifiers?: { type: string; value: number; turns_remaining: number; source: string }[];
 }
 
 export interface GameState {
@@ -37,6 +55,26 @@ export interface GameState {
     diplomacy_enabled: boolean;
     tutorial?: boolean;
     tutorial_step?: number;
+    victory_type?: string;
+    allowed_victory_conditions?: string[];
+    victory_threshold?: number;
+    factions_enabled?: boolean;
+    economy_enabled?: boolean;
+    tech_trees_enabled?: boolean;
+    events_enabled?: boolean;
+    naval_enabled?: boolean;
+    stability_enabled?: boolean;
+  };
+  era_modifiers?: {
+    legion_reroll?: boolean;
+    castle_fortification?: boolean;
+    sea_lanes?: boolean;
+    wartime_logistics?: boolean;
+    influence_spread?: boolean;
+    influence_range?: number;
+    precision_strike?: boolean;
+    rifle_doctrine?: boolean;
+    carbonari_network?: boolean;
   };
   /** Server-authoritative; may be absent on older saved games. */
   draft_units_remaining?: number;

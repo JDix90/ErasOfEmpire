@@ -1,6 +1,8 @@
 import type { GameState, GameMap, AiDifficulty } from '../../types';
-import { resolveCombat, calculateReinforcements } from '../combat/combatResolver';
-import { calculateContinentBonuses, syncTerritoryCounts } from '../state/gameStateManager';
+import { calculateReinforcements } from '../combat/combatResolver';
+import { calculateContinentBonuses } from '../state/gameStateManager';
+import { getAllowedVictoryConditions } from '../state/gameSettings';
+import { getFactionById } from '../eras';
 
 export interface AiAction {
   type: 'draft' | 'attack' | 'fortify' | 'end_phase';
@@ -52,10 +54,10 @@ export function computeAiTurn(
   const cfg = DIFFICULTY_CONFIG[difficulty];
   const actions: AiAction[] = [];
   const playerId = state.players[state.current_player_index].player_id;
+  const player = state.players[state.current_player_index];
 
   // ── Draft Phase ──────────────────────────────────────────────────────────
   const continentBonus = calculateContinentBonuses(state, map, playerId);
-  const player = state.players[state.current_player_index];
   const reinforcements = calculateReinforcements(
     player.territory_count,
     continentBonus,
@@ -71,6 +73,22 @@ export function computeAiTurn(
   // ── Attack Phase ─────────────────────────────────────────────────────────
   const attackActions = selectAttacks(state, map, playerId, cfg.randomFactor, difficulty);
   actions.push(...attackActions);
+
+  // Use influence ability if era supports it (medium+ difficulty)
+  if (
+    difficulty !== 'easy' &&
+    (state.era_modifiers?.influence_spread || state.era_modifiers?.carbonari_network) &&
+    !state.influence_used_this_turn
+  ) {
+    const influenceTarget = selectInfluenceTarget(state, map, playerId);
+    if (influenceTarget) {
+      actions.push({ type: 'end_phase' }); // marks influence via a custom action type
+      // Note: actual influence is sent as a separate event from the AI runner
+      // We use a synthetic action type that runAiWithTimeout understands
+      actions.push({ type: 'attack', from: '__influence__', to: influenceTarget, units: 0 });
+    }
+  }
+
   actions.push({ type: 'end_phase' }); // attack → fortify
 
   // ── Fortify Phase ────────────────────────────────────────────────────────
@@ -135,6 +153,36 @@ export function evaluateBoard(
 
 // ── Private helpers ──────────────────────────────────────────────────────────
 
+/** Extra attack score toward enemy capitals and secret-mission targets. */
+function attackObjectiveBonus(state: GameState, attackerId: string, targetTerritoryId: string): number {
+  let b = 0;
+  const allowed = getAllowedVictoryConditions(state.settings);
+  const me = state.players.find((p) => p.player_id === attackerId);
+  if (!me) return 0;
+
+  if (allowed.includes('capital')) {
+    for (const o of state.players) {
+      if (o.player_id === attackerId || o.is_eliminated) continue;
+      if (o.capital_territory_id === targetTerritoryId) b += 3;
+    }
+  }
+
+  if (allowed.includes('secret_mission') && me.secret_mission) {
+    const m = me.secret_mission;
+    if (m.kind === 'capture_territories') {
+      if (m.territory_ids[0] === targetTerritoryId || m.territory_ids[1] === targetTerritoryId) {
+        b += 2.5;
+      }
+    }
+    if (m.kind === 'eliminate_player') {
+      const owner = state.territories[targetTerritoryId]?.owner_id;
+      if (owner === m.target_player_id) b += 2;
+    }
+  }
+
+  return b;
+}
+
 function selectDraftTarget(
   state: GameState,
   map: GameMap,
@@ -144,6 +192,14 @@ function selectDraftTarget(
   const adjacency = buildAdjacencyMap(map);
   let bestTid: string | null = null;
   let bestScore = -Infinity;
+
+  // Faction home regions get extra weight
+  const player = state.players.find((p) => p.player_id === playerId);
+  const factionHomeRegions: string[] = [];
+  if (state.settings.factions_enabled && player?.faction_id) {
+    const faction = getFactionById(state.era, player.faction_id);
+    if (faction) factionHomeRegions.push(...faction.home_region_ids);
+  }
 
   for (const [tid, tState] of Object.entries(state.territories)) {
     if (tState.owner_id !== playerId) continue;
@@ -156,7 +212,12 @@ function selectDraftTarget(
     const threatScore = enemyNeighbors.reduce(
       (s, nid) => s + (state.territories[nid]?.unit_count ?? 0), 0
     );
-    const score = threatScore - tState.unit_count + Math.random() * randomFactor * 10;
+
+    // Bonus for faction home region border territories
+    const mapTerritory = map.territories.find((t) => t.territory_id === tid);
+    const homeBonus = mapTerritory && factionHomeRegions.includes(mapTerritory.region_id) ? 3 : 0;
+
+    const score = threatScore - tState.unit_count + homeBonus + Math.random() * randomFactor * 10;
     if (score > bestScore) {
       bestScore = score;
       bestTid = tid;
@@ -191,11 +252,21 @@ function selectAttacks(
       if (nOwner && isTruceActive(state, playerId, nOwner)) continue;
 
       const attackUnits = tState.unit_count - 1;
-      const attackDice = Math.min(attackUnits, 3);
+
+      // Determine effective attack dice (era-aware)
+      const conn = map.connections.find(
+        (c) => (c.from === tid && c.to === nid) || (c.from === nid && c.to === tid)
+      );
+      const isSeaLane = state.era_modifiers?.sea_lanes && conn?.type === 'sea';
+      const isPrecision = state.era_modifiers?.precision_strike && tState.unit_count >= 4;
+      const attackDice = isPrecision ? 3 : isSeaLane ? Math.min(attackUnits, 2) : Math.min(attackUnits, 3);
       const defDice = Math.min(nState.unit_count, 2);
 
       // Simple favorability: attacker dice advantage
-      const score = (attackDice - defDice) + Math.random() * randomFactor * 3;
+      // Sea-lane attacks get a slight penalty for the reduced dice
+      const seaPenalty = isSeaLane ? -0.5 : 0;
+      const objectiveBonus = attackObjectiveBonus(state, playerId, nid);
+      const score = (attackDice - defDice) + seaPenalty + objectiveBonus + Math.random() * randomFactor * 3;
       if (score > 0 || difficulty === 'easy') {
         candidates.push({ from: tid, to: nid, score });
       }
@@ -213,6 +284,71 @@ function selectAttacks(
   }
 
   return actions;
+}
+
+/**
+ * Select best influence target for Cold War / Risorgimento era.
+ * Tries to pick a low-unit adjacent or near-adjacent enemy territory.
+ */
+function selectInfluenceTarget(
+  state: GameState,
+  map: GameMap,
+  playerId: string
+): string | null {
+  const hopLimit = state.era_modifiers?.influence_range ?? 1;
+  const adjacency: Record<string, string[]> = {};
+  for (const conn of map.connections) {
+    if (!adjacency[conn.from]) adjacency[conn.from] = [];
+    if (!adjacency[conn.to]) adjacency[conn.to] = [];
+    adjacency[conn.from].push(conn.to);
+    adjacency[conn.to].push(conn.from);
+  }
+
+  const ownedSet = new Set(
+    Object.entries(state.territories)
+      .filter(([, t]) => t.owner_id === playerId)
+      .map(([id]) => id)
+  );
+
+  // BFS to collect reachable territories within hopLimit
+  const reachable = new Set<string>();
+  const visited = new Set<string>(ownedSet);
+  let frontier = [...ownedSet];
+  for (let hop = 0; hop < hopLimit; hop++) {
+    const next: string[] = [];
+    for (const tid of frontier) {
+      for (const nid of (adjacency[tid] ?? [])) {
+        if (!visited.has(nid)) {
+          visited.add(nid);
+          next.push(nid);
+          if (state.territories[nid]?.owner_id !== playerId) {
+            reachable.add(nid);
+          }
+        }
+      }
+    }
+    frontier = next;
+  }
+
+  // Prefer neutral territories, then low-garrison enemy territories
+  let best: string | null = null;
+  let bestScore = Infinity;
+  for (const tid of reachable) {
+    const t = state.territories[tid];
+    if (!t) continue;
+    const score = (t.owner_id === null ? -10 : 0) + t.unit_count;
+    if (score < bestScore) {
+      bestScore = score;
+      best = tid;
+    }
+  }
+
+  // Verify we have enough spare units (≥4 total — need 3 to spend + 1 in reserve)
+  const totalUnits = Object.values(state.territories)
+    .filter((t) => t.owner_id === playerId)
+    .reduce((sum, t) => sum + t.unit_count, 0);
+
+  return totalUnits >= 4 ? best : null;
 }
 
 function selectFortify(

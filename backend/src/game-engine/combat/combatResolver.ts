@@ -59,11 +59,20 @@ export function resolveCombat(
     attackerRolls.sort((a, b) => b - a);
   }
 
+  // Medieval era: fortified garrison (≥4 units) rolls 3 defending dice
+  if (eraModifiers?.castle_fortification && !defenderDiceOverride && defendingUnits >= 4) {
+    const extraRoll = rng();
+    defenderRolls.push(extraRoll);
+    defenderRolls.sort((a, b) => b - a);
+    // Only keep top 2 for comparison (added die only helps by replacing the lowest kept die)
+    // Actually keep all 3 — comparisons will be capped to min(attacker, defender) pairs
+  }
+
   let attackerLosses = 0;
   let defenderLosses = 0;
 
-  // Compare dice pairs (highest vs highest, second vs second)
-  const comparisons = Math.min(attackerDice, defenderDice);
+  // Compare dice pairs (highest vs highest, second vs second, etc.)
+  const comparisons = Math.min(attackerRolls.length, defenderRolls.length);
   for (let i = 0; i < comparisons; i++) {
     if (attackerRolls[i] > defenderRolls[i]) {
       // Attacker wins this comparison — defender loses a unit
@@ -72,6 +81,35 @@ export function resolveCombat(
       // Defender wins ties — attacker loses a unit
       attackerLosses++;
     }
+  }
+
+  // ACW era: re-roll any attacker die that tied with a defender die (keep better result)
+  if (eraModifiers?.rifle_doctrine) {
+    // Recalculate using rerolled tied dice
+    const rerollComparisons = Math.min(attackerRolls.length, defenderRolls.length);
+    let newAttackerLosses = 0;
+    let newDefenderLosses = 0;
+    const rerolledAttackerRolls = [...attackerRolls];
+    for (let i = 0; i < rerollComparisons; i++) {
+      if (rerolledAttackerRolls[i] === defenderRolls[i]) {
+        // Tie: attacker re-rolls this die
+        const reroll = rng();
+        rerolledAttackerRolls[i] = Math.max(rerolledAttackerRolls[i], reroll);
+      }
+    }
+    rerolledAttackerRolls.sort((a, b) => b - a);
+    for (let i = 0; i < rerollComparisons; i++) {
+      if (rerolledAttackerRolls[i] > defenderRolls[i]) {
+        newDefenderLosses++;
+      } else {
+        newAttackerLosses++;
+      }
+    }
+    // Replace the original loss tallies with the rifle-doctrine adjusted ones
+    attackerLosses = newAttackerLosses;
+    defenderLosses = newDefenderLosses;
+    // Update attacker_rolls in place so the client can see the rerolled dice
+    attackerRolls.splice(0, attackerRolls.length, ...rerolledAttackerRolls);
   }
 
   const territory_captured =

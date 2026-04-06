@@ -1,0 +1,56 @@
+import type { EventCard } from '../../../types';
+
+export const ancientEvents: EventCard[] = [
+  {
+    card_id: 'ancient_barbarian_horde',
+    title: 'Barbarian Horde',
+    description: 'Nomadic raiders sweep across the frontier. Lose 2 units from your largest territories.',
+    category: 'player_targeted',
+    era_id: 'ancient',
+    effect: { type: 'units_removed', target: 'player', value: 2 },
+  },
+  {
+    card_id: 'ancient_roman_roads',
+    title: 'Roman Roads',
+    description: 'New roads accelerate troop movement. Gain 3 reinforcements across your territories.',
+    category: 'player_targeted',
+    era_id: 'ancient',
+    effect: { type: 'units_added', target: 'player', value: 3 },
+  },
+  {
+    card_id: 'ancient_plague',
+    title: 'Plague of Antoninus',
+    description: 'A devastating plague sweeps the known world, weakening all armies.',
+    category: 'global',
+    era_id: 'ancient',
+    effect: { type: 'region_disaster', target: 'region', value: 1 },
+    affects_all_players: true,
+  },
+  {
+    card_id: 'ancient_grain_surplus',
+    title: 'Grain Surplus',
+    description: 'A bountiful harvest boosts your economy for 2 turns.',
+    category: 'player_targeted',
+    era_id: 'ancient',
+    effect: { type: 'production_bonus', target: 'player', value: 2, duration_turns: 2 },
+  },
+  {
+    card_id: 'ancient_diplomatic_marriage',
+    title: 'Diplomatic Marriage',
+    description: 'A royal union forces a temporary truce with a rival.',
+    category: 'player_targeted',
+    era_id: 'ancient',
+    effect: { type: 'truce', target: 'player', value: 2 },
+  },
+  {
+    card_id: 'ancient_war_elephants',
+    title: 'War Elephants',
+    description: 'Choose: bolster your attack or strengthen your defense for 2 turns.',
+    category: 'player_targeted',
+    era_id: 'ancient',
+    choices: [
+      { choice_id: 'attack', label: 'Attack boost (+1 die for 2 turns)', effect: { type: 'attack_modifier', target: 'player', value: 1, duration_turns: 2 } },
+      { choice_id: 'defense', label: 'Defense boost (+1 die for 2 turns)', effect: { type: 'defense_modifier', target: 'player', value: 1, duration_turns: 2 } },
+    ],
+  },
+];
